@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Iron Quest" />
+  <meta name="description" content="Iron Quest — gym strength RPG. Log lifts, level stats, chase PRs and weekly streaks." />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+  <title>Iron Quest</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">⬡</span>
+        <div>
+          <h1>Iron Quest</h1>
+          <p class="subtitle" id="greeting">Hey, Long</p>
+        </div>
+      </div>
+      <button type="button" class="icon-btn" id="btn-settings" aria-label="Settings" title="Settings">⚙</button>
+    </header>
+
+    <main id="view-home" class="view active">
+      <section class="card hero">
+        <div class="level-row">
+          <div class="level-badge" id="level-badge">1</div>
+          <div class="level-meta">
+            <div class="level-label">Level <span id="level-num">1</span> · <span id="rank-name">Novice</span></div>
+            <div class="xp-bar"><div class="xp-fill" id="xp-fill" style="width:0%"></div></div>
+            <div class="xp-text"><span id="xp-current">0</span> / <span id="xp-next">100</span> XP · Today <span id="xp-today">0</span>/<span id="xp-cap">150</span></div>
+          </div>
+        </div>
+        <div class="streak-row">
+          <div class="streak-pill">
+            <span class="streak-fire">🔥</span>
+            <div>
+              <strong id="streak-weeks">0</strong> week streak
+              <div class="muted small" id="streak-detail">No workouts yet</div>
+            </div>
+          </div>
+          <button type="button" class="btn ghost small" id="btn-freeze" hidden>❄ Freeze</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Stats</h2>
+        <div class="stats-grid" id="stats-grid"></div>
+      </section>
+
+      <section class="card">
+        <h2>Quests</h2>
+        <div id="quests-list" class="quests"></div>
+      </section>
+
+      <section class="card" id="last-workout-card">
+        <h2>Last workout</h2>
+        <div id="last-workout" class="muted">No sessions logged yet. Hit the iron.</div>
+      </section>
+
+      <button type="button" class="btn primary big cta" id="btn-log">Log workout</button>
+    </main>
+
+    <main id="view-workout" class="view">
+      <div class="view-header">
+        <button type="button" class="btn ghost" id="btn-workout-back">← Back</button>
+        <h2 id="workout-title">New session</h2>
+        <span></span>
+      </div>
+
+      <section class="card" id="session-pick">
+        <h3>Session type</h3>
+        <div class="chip-row" id="session-types"></div>
+        <label class="field">
+          <span>Custom name (optional)</span>
+          <input type="text" id="session-name" placeholder="e.g. Heavy Push" maxlength="40" />
+        </label>
+        <button type="button" class="btn primary" id="btn-start-session">Start session</button>
+      </section>
+
+      <section class="card hidden" id="session-active">
+        <div class="session-meta">
+          <span class="tag" id="active-type">Push</span>
+          <span class="muted small" id="active-time"></span>
+        </div>
+
+        <div class="add-ex">
+          <label class="field">
+            <span>Add exercise</span>
+            <input type="text" id="ex-search" list="ex-library" placeholder="Search or type name…" autocomplete="off" />
+            <datalist id="ex-library"></datalist>
+          </label>
+          <button type="button" class="btn secondary" id="btn-add-ex">Add</button>
+        </div>
+
+        <div id="exercise-list" class="exercise-list"></div>
+
+        <label class="field">
+          <span>Session notes (bonus Intelligence)</span>
+          <textarea id="session-notes" rows="2" placeholder="How did it feel?"></textarea>
+        </label>
+
+        <div class="row-actions">
+          <button type="button" class="btn danger ghost" id="btn-cancel-session">Discard</button>
+          <button type="button" class="btn primary" id="btn-complete-session">Complete → XP</button>
+        </div>
+      </section>
+    </main>
+
+    <main id="view-history" class="view">
+      <div class="view-header">
+        <h2>History</h2>
+      </div>
+      <section class="card">
+        <div id="history-list" class="history-list muted">No workouts yet.</div>
+      </section>
+      <section class="card">
+        <h2>Personal records</h2>
+        <div id="pr-list" class="pr-list muted">PRs appear when you set a best set.</div>
+      </section>
+    </main>
+
+    <main id="view-settings" class="view">
+      <div class="view-header">
+        <button type="button" class="btn ghost" id="btn-settings-back">← Back</button>
+        <h2>Settings</h2>
+        <span></span>
+      </div>
+      <section class="card">
+        <label class="field">
+          <span>Display name</span>
+          <input type="text" id="setting-name" maxlength="24" />
+        </label>
+        <button type="button" class="btn secondary" id="btn-save-name">Save name</button>
+      </section>
+      <section class="card">
+        <h3>About</h3>
+        <p class="muted small">Iron Quest stores everything locally in <code>iron-quest-v1</code>. Install from Share → Add to Home Screen on iPhone.</p>
+        <p class="muted small">Version 1.0 · Weekly streak = consecutive ISO weeks with ≥1 completed workout.</p>
+      </section>
+      <section class="card danger-zone">
+        <h3>Reset</h3>
+        <p class="muted small">Wipes all workouts, XP, stats, PRs, and streak. Cannot undo.</p>
+        <button type="button" class="btn danger" id="btn-reset">Reset all data…</button>
+      </section>
+    </main>
+
+    <nav class="tabbar" aria-label="Main">
+      <button type="button" class="tab active" data-view="home">Home</button>
+      <button type="button" class="tab" data-view="workout">Log</button>
+      <button type="button" class="tab" data-view="history">History</button>
+    </nav>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <dialog id="confirm-dialog">
+    <form method="dialog" class="dialog-body">
+      <h3 id="confirm-title">Confirm</h3>
+      <p id="confirm-msg" class="muted"></p>
+      <div class="row-actions">
+        <button type="submit" value="cancel" class="btn ghost">Cancel</button>
+        <button type="submit" value="ok" class="btn danger" id="confirm-ok">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="./app.js"></script>
+</body>
+</html>
