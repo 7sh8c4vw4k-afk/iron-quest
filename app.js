@@ -3,41 +3,85 @@
 
   const STORAGE_KEY = 'iron-quest-v1';
   const DAILY_XP_CAP = 150;
-  const STAT_NAMES = ['strength', 'conditioning', 'endurance', 'stamina', 'intelligence'];
-  const STAT_LABELS = {
-    strength: 'Strength',
-    conditioning: 'Conditioning',
-    endurance: 'Endurance',
-    stamina: 'Stamina',
-    intelligence: 'Intelligence'
+  const OLD_STAT_KEYS = ['strength', 'conditioning', 'endurance', 'stamina', 'intelligence'];
+  const STAT_DEFS = [
+    { id: 'chest', label: 'Chest' },
+    { id: 'tricep', label: 'Tricep' },
+    { id: 'delt', label: 'Delt' },
+    { id: 'serratus', label: 'Serratus' },
+    { id: 'lat', label: 'Lat' },
+    { id: 'bicep', label: 'Bicep' },
+    { id: 'trap', label: 'Trap' },
+    { id: 'rotator', label: 'Rotator' },
+    { id: 'glute', label: 'Glute' },
+    { id: 'hamstring', label: 'Hamstring' },
+    { id: 'quad', label: 'Quad' },
+    { id: 'calve', label: 'Calve' },
+    { id: 'core', label: 'Core' },
+    { id: 'forearm', label: 'Forearm' },
+    { id: 'neck', label: 'Neck' },
+    { id: 'stretch', label: 'Stretch' },
+    { id: 'meditation', label: 'Meditation' },
+    { id: 'cardio', label: 'Cardio' }
+  ];
+  const STAT_NAMES = STAT_DEFS.map((s) => s.id);
+  const STAT_LABELS = Object.fromEntries(STAT_DEFS.map((s) => [s.id, s.label]));
+  const ACTIVITY_STATS = new Set(['stretch', 'meditation', 'cardio']);
+  const SESSION_TYPES = ['Push', 'Pull', 'Legs', 'Upper', 'Full', 'Stretch', 'Meditation', 'Cardio', 'Custom'];
+  const SESSION_ACTIVITY_MAP = {
+    Stretch: 'stretch',
+    Meditation: 'meditation',
+    Cardio: 'cardio'
   };
-  const SESSION_TYPES = ['Push', 'Pull', 'Legs', 'Upper', 'Full', 'Custom'];
   const RANKS = [
     [1, 'Novice'], [5, 'Apprentice'], [10, 'Ironhand'],
     [15, 'Veteran'], [20, 'Champion'], [30, 'Titan'], [50, 'Legend']
   ];
 
+  // primary / secondary = body-part or activity ids; tags kept for UI badges
   const EXERCISE_LIBRARY = [
-    { name: 'Bench Press', tags: ['compound', 'push', 'chest'] },
-    { name: 'Squat', tags: ['compound', 'legs'] },
-    { name: 'Deadlift', tags: ['compound', 'pull', 'legs'] },
-    { name: 'Overhead Press', tags: ['compound', 'push', 'shoulders'] },
-    { name: 'Barbell Row', tags: ['compound', 'pull', 'back'] },
-    { name: 'Pull-Up', tags: ['compound', 'pull', 'back'] },
-    { name: 'Lat Pulldown', tags: ['pull', 'back'] },
-    { name: 'Romanian Deadlift', tags: ['compound', 'legs', 'pull'] },
-    { name: 'Leg Press', tags: ['legs'] },
-    { name: 'Bicep Curl', tags: ['pull', 'arms'] },
-    { name: 'Tricep Pushdown', tags: ['push', 'arms'] },
-    { name: 'Plank', tags: ['conditioning', 'core'] },
-    { name: 'Incline Bench Press', tags: ['compound', 'push', 'chest'] },
-    { name: 'Dumbbell Row', tags: ['compound', 'pull', 'back'] },
-    { name: 'Lunges', tags: ['legs'] },
-    { name: 'Face Pull', tags: ['pull', 'shoulders'] },
-    { name: 'Cable Fly', tags: ['push', 'chest'] },
-    { name: 'Leg Curl', tags: ['legs'] },
-    { name: 'Calf Raise', tags: ['legs'] },
-    { name: 'Burpees', tags: ['conditioning'] }
+    { name: 'Bench Press', primary: ['chest'], secondary: ['tricep', 'delt'], tags: ['compound', 'push'] },
+    { name: 'Incline Bench Press', primary: ['chest'], secondary: ['tricep', 'delt'], tags: ['compound', 'push'] },
+    { name: 'Cable Fly', primary: ['chest'], secondary: ['delt'], tags: ['push'] },
+    { name: 'Push-Up', primary: ['chest'], secondary: ['tricep', 'serratus', 'core'], tags: ['push'] },
+    { name: 'Overhead Press', primary: ['delt'], secondary: ['tricep', 'trap'], tags: ['compound', 'push'] },
+    { name: 'Lateral Raise', primary: ['delt'], secondary: [], tags: ['push'] },
+    { name: 'Tricep Pushdown', primary: ['tricep'], secondary: [], tags: ['push'] },
+    { name: 'Skull Crusher', primary: ['tricep'], secondary: [], tags: ['push'] },
+    { name: 'Serratus Punch', primary: ['serratus'], secondary: ['delt'], tags: ['push'] },
+    { name: 'Barbell Row', primary: ['lat'], secondary: ['bicep', 'trap'], tags: ['compound', 'pull'] },
+    { name: 'Dumbbell Row', primary: ['lat'], secondary: ['bicep'], tags: ['compound', 'pull'] },
+    { name: 'Pull-Up', primary: ['lat'], secondary: ['bicep', 'forearm'], tags: ['compound', 'pull'] },
+    { name: 'Chin-Up', primary: ['lat'], secondary: ['bicep', 'forearm'], tags: ['compound', 'pull'] },
+    { name: 'Lat Pulldown', primary: ['lat'], secondary: ['bicep'], tags: ['pull'] },
+    { name: 'Face Pull', primary: ['rotator'], secondary: ['delt', 'trap'], tags: ['pull'] },
+    { name: 'Bicep Curl', primary: ['bicep'], secondary: ['forearm'], tags: ['pull'] },
+    { name: 'Hammer Curl', primary: ['bicep'], secondary: ['forearm'], tags: ['pull'] },
+    { name: 'Shrug', primary: ['trap'], secondary: ['forearm'], tags: ['pull'] },
+    { name: 'Farmer Carry', primary: ['forearm'], secondary: ['trap', 'core'], tags: ['carry'] },
+    { name: 'Deadlift', primary: ['hamstring', 'glute'], secondary: ['lat', 'trap', 'core'], tags: ['compound', 'pull', 'legs'] },
+    { name: 'Romanian Deadlift', primary: ['hamstring'], secondary: ['glute'], tags: ['compound', 'legs', 'pull'] },
+    { name: 'Hip Thrust', primary: ['glute'], secondary: ['hamstring'], tags: ['legs'] },
+    { name: 'Squat', primary: ['quad'], secondary: ['glute', 'core'], tags: ['compound', 'legs'] },
+    { name: 'Leg Press', primary: ['quad'], secondary: ['glute'], tags: ['legs'] },
+    { name: 'Lunges', primary: ['quad'], secondary: ['glute'], tags: ['legs'] },
+    { name: 'Leg Curl', primary: ['hamstring'], secondary: [], tags: ['legs'] },
+    { name: 'Leg Extension', primary: ['quad'], secondary: [], tags: ['legs'] },
+    { name: 'Calf Raise', primary: ['calve'], secondary: [], tags: ['legs'] },
+    { name: 'Plank', primary: ['core'], secondary: [], tags: ['core'] },
+    { name: 'Hanging Leg Raise', primary: ['core'], secondary: ['forearm'], tags: ['core'] },
+    { name: 'Cable Crunch', primary: ['core'], secondary: [], tags: ['core'] },
+    { name: 'Neck Curl', primary: ['neck'], secondary: [], tags: ['neck'] },
+    { name: 'Neck Extension', primary: ['neck'], secondary: [], tags: ['neck'] },
+    { name: 'Stretch', primary: ['stretch'], secondary: [], tags: ['activity', 'stretch'] },
+    { name: 'Mobility Flow', primary: ['stretch'], secondary: [], tags: ['activity', 'stretch'] },
+    { name: 'Meditation', primary: ['meditation'], secondary: [], tags: ['activity', 'meditation'] },
+    { name: 'Breathwork', primary: ['meditation'], secondary: [], tags: ['activity', 'meditation'] },
+    { name: 'Cardio', primary: ['cardio'], secondary: [], tags: ['activity', 'cardio'] },
+    { name: 'Run', primary: ['cardio'], secondary: [], tags: ['activity', 'cardio'] },
+    { name: 'Bike', primary: ['cardio'], secondary: [], tags: ['activity', 'cardio'] },
+    { name: 'Row Erg', primary: ['cardio'], secondary: ['lat', 'core'], tags: ['activity', 'cardio'] },
+    { name: 'Burpees', primary: ['cardio'], secondary: ['core', 'chest'], tags: ['activity', 'cardio'] }
   ];
 
   const COMPOUND_PATTERNS = [
@@ -46,23 +90,66 @@
     /rdl/i, /romanian/i
   ];
 
+  const NAME_INFER = [
+    { re: /bench|fly|pec\b|push[\s-]?up/i, primary: ['chest'], secondary: ['tricep', 'delt'] },
+    { re: /ohp|overhead|military\s*press|lateral\s*raise|delt/i, primary: ['delt'], secondary: ['tricep'] },
+    { re: /tricep|pushdown|skull|dip/i, primary: ['tricep'], secondary: [] },
+    { re: /serratus/i, primary: ['serratus'], secondary: [] },
+    { re: /pulldown|pull[\s-]?up|chin[\s-]?up|\brow\b|lat\b/i, primary: ['lat'], secondary: ['bicep'] },
+    { re: /curl|bicep/i, primary: ['bicep'], secondary: ['forearm'] },
+    { re: /face\s*pull|rotator|external\s*rot/i, primary: ['rotator'], secondary: ['delt'] },
+    { re: /shrug|trap/i, primary: ['trap'], secondary: [] },
+    { re: /rdl|romanian|hamstring|leg\s*curl/i, primary: ['hamstring'], secondary: ['glute'] },
+    { re: /hip\s*thrust|glute|kickback/i, primary: ['glute'], secondary: ['hamstring'] },
+    { re: /squat|leg\s*press|lunge|leg\s*extension|quad/i, primary: ['quad'], secondary: ['glute'] },
+    { re: /deadlift/i, primary: ['hamstring', 'glute'], secondary: ['lat', 'trap', 'core'] },
+    { re: /calf|calve/i, primary: ['calve'], secondary: [] },
+    { re: /plank|crunch|sit[\s-]?up|core|hollow/i, primary: ['core'], secondary: [] },
+    { re: /farmer|forearm|grip|wrist/i, primary: ['forearm'], secondary: [] },
+    { re: /neck/i, primary: ['neck'], secondary: [] },
+    { re: /stretch|mobility|yoga/i, primary: ['stretch'], secondary: [] },
+    { re: /meditat|breath|mindful/i, primary: ['meditation'], secondary: [] },
+    { re: /cardio|run|bike|erg|burpee|hiit|jog|swim/i, primary: ['cardio'], secondary: [] }
+  ];
+
   // —— state ——
+  function defaultStats() {
+    const stats = {};
+    for (const id of STAT_NAMES) stats[id] = 1;
+    return stats;
+  }
+
   function defaultState() {
     return {
-      version: 1,
+      version: 2,
       displayName: 'Long',
       level: 1,
       xp: 0,
       xpToday: 0,
       xpTodayDate: localDateKey(new Date()),
-      stats: { strength: 1, conditioning: 1, endurance: 1, stamina: 1, intelligence: 1 },
+      stats: defaultStats(),
       workouts: [],
-      prs: {}, // name -> { weight, reps, e1rm, date }
-      streakFreezeMonth: null, // 'YYYY-MM' when freeze used
+      prs: {},
+      streakFreezeMonth: null,
       freezeAvailable: true,
       draft: null,
-      questsClaimed: { daily: null, weekly: null } // ISO date / ISO week keys
+      questsClaimed: { daily: null, weekly: null }
     };
+  }
+
+  function normalizeStats(rawStats) {
+    if (!rawStats || typeof rawStats !== 'object') return defaultStats();
+    const keys = Object.keys(rawStats);
+    const hasOld = keys.some((k) => OLD_STAT_KEYS.includes(k));
+    const hasNew = keys.some((k) => STAT_NAMES.includes(k));
+    if (hasOld && !hasNew) return defaultStats();
+    const out = defaultStats();
+    for (const id of STAT_NAMES) {
+      if (typeof rawStats[id] === 'number' && !Number.isNaN(rawStats[id])) {
+        out[id] = Math.min(99, Math.max(0, rawStats[id]));
+      }
+    }
+    return out;
   }
 
   let state = load();
@@ -72,7 +159,16 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return defaultState();
       const parsed = JSON.parse(raw);
-      return { ...defaultState(), ...parsed, stats: { ...defaultState().stats, ...(parsed.stats || {}) } };
+      const base = defaultState();
+      return {
+        ...base,
+        ...parsed,
+        version: 2,
+        stats: normalizeStats(parsed.stats),
+        questsClaimed: { ...base.questsClaimed, ...(parsed.questsClaimed || {}) },
+        prs: parsed.prs && typeof parsed.prs === 'object' ? parsed.prs : {},
+        workouts: Array.isArray(parsed.workouts) ? parsed.workouts : []
+      };
     } catch {
       return defaultState();
     }
@@ -82,7 +178,6 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
-  // —— dates / ISO weeks ——
   function localDateKey(d) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -101,7 +196,6 @@
 
   function prevIsoWeek(key) {
     const [y, w] = key.split('-W').map(Number);
-    // Monday of that ISO week
     const jan4 = new Date(Date.UTC(y, 0, 4));
     const day = jan4.getUTCDay() || 7;
     const monday = new Date(jan4);
@@ -122,7 +216,6 @@
     }
   }
 
-  // —— XP / level ——
   function xpForLevel(level) {
     return Math.round(100 + (level - 1) * 40 + Math.pow(level - 1, 1.35) * 8);
   }
@@ -150,6 +243,8 @@
   }
 
   function bumpStat(key, amount) {
+    if (!STAT_NAMES.includes(key)) return;
+    if (!state.stats[key] && state.stats[key] !== 0) state.stats[key] = 1;
     state.stats[key] = Math.min(99, Math.round((state.stats[key] + amount) * 10) / 10);
   }
 
@@ -161,10 +256,30 @@
   function estimated1RM(weight, reps) {
     if (!weight || !reps) return 0;
     if (reps === 1) return weight;
-    return weight * (1 + reps / 30); // Epley-ish light
+    return weight * (1 + reps / 30);
   }
 
-  // —— streak ——
+  function lookupExercise(name) {
+    const lib = EXERCISE_LIBRARY.find((e) => e.name.toLowerCase() === String(name || '').toLowerCase());
+    if (lib) {
+      return {
+        primary: lib.primary.slice(),
+        secondary: (lib.secondary || []).slice(),
+        tags: lib.tags || []
+      };
+    }
+    for (const rule of NAME_INFER) {
+      if (rule.re.test(name || '')) {
+        return {
+          primary: rule.primary.slice(),
+          secondary: (rule.secondary || []).slice(),
+          tags: []
+        };
+      }
+    }
+    return { primary: [], secondary: [], tags: [] };
+  }
+
   function weeksWithWorkouts() {
     const set = new Set();
     for (const w of state.workouts) {
@@ -179,7 +294,6 @@
     const now = new Date();
     let cur = isoWeekKey(now);
     let streak = 0;
-    // If current week has no workout, start from previous week (streak still alive until week ends)
     if (!weeks.has(cur)) {
       cur = prevIsoWeek(cur);
     }
@@ -208,7 +322,6 @@
       toast('No gap to freeze — streak is alive');
       return;
     }
-    // Inject a phantom completion marker for last week so streak bridges one gap
     state.workouts.push({
       id: 'freeze-' + Date.now(),
       type: 'Freeze',
@@ -216,7 +329,6 @@
       exercises: [],
       notes: '',
       completedAt: (() => {
-        // date within last ISO week (Wednesday)
         const [y, w] = lastWeek.split('-W').map(Number);
         const jan4 = new Date(Date.UTC(y, 0, 4));
         const day = jan4.getUTCDay() || 7;
@@ -235,7 +347,6 @@
     renderHome();
   }
 
-  // —— quests ——
   function workoutsOnDate(dateKey) {
     return state.workouts.filter((w) => !w.isFreeze && w.completedAt && localDateKey(new Date(w.completedAt)) === dateKey).length;
   }
@@ -260,63 +371,120 @@
     return bonus;
   }
 
-  // —— workout scoring ——
+  const PRIMARY_PER_SET = 0.28;
+  const SECONDARY_PER_SET = 0.12;
+  const VOLUME_SCALE = 0.00035;
+  const ACTIVITY_PER_SET = 0.45;
+  const PER_STAT_SOFT_CAP = 2.4;
+  const SESSION_TOTAL_SOFT_CAP = 12;
+
+  function emptyDelta() {
+    const d = {};
+    for (const id of STAT_NAMES) d[id] = 0;
+    return d;
+  }
+
+  function addDelta(delta, key, amount) {
+    if (!STAT_NAMES.includes(key) || amount <= 0) return;
+    delta[key] = (delta[key] || 0) + amount;
+  }
+
+  function softCapDelta(delta) {
+    let total = 0;
+    for (const id of STAT_NAMES) {
+      delta[id] = Math.min(PER_STAT_SOFT_CAP, Math.round((delta[id] || 0) * 100) / 100);
+      total += delta[id];
+    }
+    if (total > SESSION_TOTAL_SOFT_CAP && total > 0) {
+      const scale = SESSION_TOTAL_SOFT_CAP / total;
+      for (const id of STAT_NAMES) {
+        delta[id] = Math.round(delta[id] * scale * 100) / 100;
+      }
+    }
+    return delta;
+  }
+
   function scoreWorkout(draft) {
-    let totalSets = 0;
     let completedSets = 0;
-    let volume = 0; // weight * reps
-    let compoundHeavy = 0;
-    let highRepSets = 0;
-    let hasRpeOrNotes = false;
+    let volume = 0;
     const prHits = [];
+    const statsDelta = emptyDelta();
 
     for (const ex of draft.exercises) {
-      const tags = (EXERCISE_LIBRARY.find((e) => e.name.toLowerCase() === ex.name.toLowerCase()) || {}).tags || [];
-      const compound = isCompound(ex.name, tags);
-      if (ex.rpe || (ex.notes && ex.notes.trim())) hasRpeOrNotes = true;
+      const map = lookupExercise(ex.name);
+      let exSets = 0;
+      let exVol = 0;
 
       for (const set of ex.sets) {
-        totalSets += 1;
         if (!set.done) continue;
         completedSets += 1;
+        exSets += 1;
         const w = Number(set.weight) || 0;
         const r = Number(set.reps) || 0;
-        volume += w * r;
-        if (r >= 12) highRepSets += 1;
-        if (compound && w > 0 && r > 0 && r <= 8) compoundHeavy += 1;
+        const setVol = w * r;
+        volume += setVol;
+        exVol += setVol;
 
         if (w > 0 && r > 0) {
           const e1 = estimated1RM(w, r);
           const prev = state.prs[ex.name];
           if (!prev || e1 > prev.e1rm) {
-            state.prs[ex.name] = { weight: w, reps: r, e1rm: Math.round(e1 * 10) / 10, date: new Date().toISOString() };
+            state.prs[ex.name] = {
+              weight: w,
+              reps: r,
+              e1rm: Math.round(e1 * 10) / 10,
+              date: new Date().toISOString()
+            };
             prHits.push(ex.name);
           }
         }
       }
+
+      if (exSets <= 0) continue;
+
+      const volBonus = Math.min(1.2, exVol * VOLUME_SCALE);
+      const isActivity = map.primary.some((p) => ACTIVITY_STATS.has(p)) ||
+        (map.tags || []).some((t) => ACTIVITY_STATS.has(t) || t === 'activity');
+
+      if (isActivity) {
+        for (const p of map.primary) {
+          if (ACTIVITY_STATS.has(p)) {
+            addDelta(statsDelta, p, exSets * ACTIVITY_PER_SET + volBonus * 0.3);
+          } else {
+            addDelta(statsDelta, p, exSets * PRIMARY_PER_SET * 0.5 + volBonus * 0.25);
+          }
+        }
+        for (const s of map.secondary) {
+          addDelta(statsDelta, s, exSets * SECONDARY_PER_SET * 0.5);
+        }
+      } else {
+        for (const p of map.primary) {
+          addDelta(statsDelta, p, exSets * PRIMARY_PER_SET + volBonus);
+        }
+        for (const s of map.secondary) {
+          addDelta(statsDelta, s, exSets * SECONDARY_PER_SET + volBonus * 0.35);
+        }
+      }
     }
 
-    if (draft.notes && draft.notes.trim()) hasRpeOrNotes = true;
+    const sessionActivity = SESSION_ACTIVITY_MAP[draft.type];
+    if (sessionActivity) {
+      const base = Math.max(0.6, completedSets * 0.35);
+      addDelta(statsDelta, sessionActivity, base);
+    }
 
-    // XP: base + light volume scale
+    softCapDelta(statsDelta);
+
     let xpRaw = 20 + completedSets * 2 + Math.min(40, Math.floor(volume / 500));
     if (draft.type === 'Full' || draft.type === 'Custom') xpRaw += 5;
+    if (sessionActivity) xpRaw += 3;
 
-    const statsDelta = { strength: 0, conditioning: 0, endurance: 0, stamina: 0, intelligence: 0 };
-    statsDelta.strength = Math.min(2.5, compoundHeavy * 0.35);
-    statsDelta.conditioning = Math.min(2.0, highRepSets * 0.25 + (tagsHasConditioning(draft) ? 0.5 : 0));
-    statsDelta.endurance = Math.min(2.0, completedSets * 0.08);
-    // stamina from weekly count after save
-    statsDelta.intelligence = hasRpeOrNotes ? 0.6 : 0.1;
+    const compact = {};
+    for (const id of STAT_NAMES) {
+      if (statsDelta[id] > 0) compact[id] = statsDelta[id];
+    }
 
-    return { xpRaw, statsDelta, completedSets, volume, prHits, hasRpeOrNotes };
-  }
-
-  function tagsHasConditioning(draft) {
-    return draft.exercises.some((ex) => {
-      const lib = EXERCISE_LIBRARY.find((e) => e.name.toLowerCase() === ex.name.toLowerCase());
-      return lib && lib.tags.includes('conditioning');
-    }) || /circuit|hiit|condition/i.test(draft.name || '') || /circuit|hiit/i.test(draft.notes || '');
+    return { xpRaw, statsDelta: compact, completedSets, volume, prHits };
   }
 
   function completeSession() {
@@ -331,8 +499,8 @@
     }
 
     const result = scoreWorkout(state.draft);
-    for (const k of STAT_NAMES) {
-      if (result.statsDelta[k]) bumpStat(k, result.statsDelta[k]);
+    for (const k of Object.keys(result.statsDelta)) {
+      bumpStat(k, result.statsDelta[k]);
     }
 
     const workout = {
@@ -350,12 +518,6 @@
 
     state.workouts.unshift(workout);
 
-    // Stamina: based on workouts this week (after adding)
-    const weekCount = workoutsInIsoWeek(isoWeekKey(new Date()));
-    const staminaBump = Math.min(1.5, 0.3 + weekCount * 0.25);
-    bumpStat('stamina', staminaBump);
-    workout.statsDelta.stamina = staminaBump;
-
     const gained = addXp(result.xpRaw);
     workout.xpAwarded = gained;
     const questBonus = claimQuestsIfNeeded();
@@ -366,6 +528,11 @@
     let msg = `+${gained} XP`;
     if (questBonus) msg += ` · +${questBonus} quest`;
     if (result.prHits.length) msg += ` · PR: ${result.prHits.slice(0, 2).join(', ')}`;
+    const topParts = Object.entries(result.statsDelta)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([k]) => STAT_LABELS[k]);
+    if (topParts.length) msg += ` · ${topParts.join('/')}`;
     if (gained === 0 && result.xpRaw > 0) msg = 'Daily XP cap reached — session saved';
     toast(msg);
 
@@ -373,7 +540,6 @@
     renderAll();
   }
 
-  // —— UI helpers ——
   function $(id) { return document.getElementById(id); }
   function toast(msg) {
     const el = $('toast');
@@ -411,7 +577,6 @@
     });
   }
 
-  // —— render ——
   function renderHome() {
     ensureDailyXpReset();
     $('greeting').textContent = `Hey, ${state.displayName}`;
@@ -435,24 +600,21 @@
       : 'Train this week to keep the streak';
 
     const freezeBtn = $('btn-freeze');
-    freezeBtn.hidden = !(streak > 0 && canUseFreeze() && !trained && !weeks.has(prevIsoWeek(thisWeek)));
-    // show freeze when there's a gap risk: last week empty and this week empty but older streak
-    // simpler: show if freeze available this month
     freezeBtn.hidden = !canUseFreeze();
     freezeBtn.title = canUseFreeze() ? 'Use 1 streak freeze this month' : 'Freeze used this month';
 
     const grid = $('stats-grid');
     grid.innerHTML = STAT_NAMES.map((k) => {
-      const v = state.stats[k];
+      const v = state.stats[k] ?? 1;
       const pct = Math.min(100, (v / 50) * 100);
-      return `<div class="stat-row">
+      const activity = ACTIVITY_STATS.has(k) ? ' activity' : '';
+      return `<div class="stat-row${activity}">
         <div class="stat-name">${STAT_LABELS[k]}</div>
         <div class="stat-bar"><div class="stat-fill" style="width:${pct}%"></div></div>
         <div class="stat-val">${v}</div>
       </div>`;
     }).join('');
 
-    // quests
     const today = localDateKey(new Date());
     const week = isoWeekKey(new Date());
     const dailyDone = workoutsOnDate(today) >= 1;
@@ -492,6 +654,17 @@
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
+  function partTagsHtml(map) {
+    const bits = [];
+    for (const p of map.primary) {
+      bits.push(`<span class="tag part">${escapeHtml(STAT_LABELS[p] || p)}</span>`);
+    }
+    for (const s of map.secondary.slice(0, 2)) {
+      bits.push(`<span class="tag part secondary">${escapeHtml(STAT_LABELS[s] || s)}</span>`);
+    }
+    return bits.join('');
+  }
+
   function renderWorkoutView() {
     const pick = $('session-pick');
     const active = $('session-active');
@@ -524,16 +697,15 @@
       return;
     }
     list.innerHTML = state.draft.exercises.map((ex, ei) => {
-      const lib = EXERCISE_LIBRARY.find((e) => e.name.toLowerCase() === ex.name.toLowerCase());
-      const tags = lib ? lib.tags : [];
-      const compound = isCompound(ex.name, tags);
+      const map = lookupExercise(ex.name);
+      const compound = isCompound(ex.name, map.tags);
       return `<div class="ex-card" data-ei="${ei}">
         <div class="ex-head">
           <div>
             <strong>${escapeHtml(ex.name)}</strong>
             <div class="ex-tags">
               ${compound ? '<span class="tag compound">compound</span>' : ''}
-              ${tags.includes('conditioning') ? '<span class="tag conditioning">conditioning</span>' : ''}
+              ${partTagsHtml(map)}
             </div>
           </div>
           <button type="button" class="btn ghost small btn-remove-ex" data-ei="${ei}">✕</button>
@@ -601,7 +773,6 @@
     renderHistory();
   }
 
-  // —— events ——
   function bind() {
     document.querySelectorAll('.tab').forEach((t) => {
       t.addEventListener('click', () => showView(t.dataset.view));
@@ -691,7 +862,6 @@
       }
       if (t.matches('.ex-notes')) {
         state.draft.exercises[Number(t.dataset.ei)].notes = t.value;
-        // don't save every keystroke heavily — debounce
         clearTimeout(bind._noteT);
         bind._noteT = setTimeout(save, 300);
       }
@@ -741,16 +911,14 @@
     });
   }
 
-  // —— PWA ——
   function registerSW() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
   }
 
-  // init
   ensureDailyXpReset();
-  claimQuestsIfNeeded(); // claim if already eligible from prior sessions today
+  claimQuestsIfNeeded();
   save();
   bind();
   renderAll();

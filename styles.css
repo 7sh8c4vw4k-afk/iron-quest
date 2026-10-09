@@ -137,11 +137,20 @@ body {
 .streak-fire { font-size: 1.5rem; }
 .streak-pill strong { color: var(--amber2); font-size: 1.15rem; }
 
-.stats-grid { display: flex; flex-direction: column; gap: 10px; }
-.stat-row { display: grid; grid-template-columns: 110px 1fr 36px; gap: 8px; align-items: center; }
-.stat-name { font-size: 0.85rem; font-weight: 600; }
+.stats-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: min(42vh, 320px);
+  overflow-y: auto;
+  padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.stat-row { display: grid; grid-template-columns: 78px 1fr 30px; gap: 6px; align-items: center; }
+.stat-row.activity .stat-name { color: var(--amber2); }
+.stat-name { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.01em; }
 .stat-bar {
-  height: 8px;
+  height: 5px;
   background: var(--bg);
   border-radius: 999px;
   overflow: hidden;
@@ -153,7 +162,19 @@ body {
   background: linear-gradient(90deg, var(--navy), var(--amber));
   transition: width 0.35s ease;
 }
-.stat-val { font-size: 0.8rem; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.stat-row.activity .stat-fill {
+  background: linear-gradient(90deg, #0ea5e9, var(--amber));
+}
+.stat-val { font-size: 0.7rem; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.tag.part {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--amber2);
+  font-size: 0.65rem;
+}
+.tag.part.secondary {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--muted);
+}
 
 .quests { display: flex; flex-direction: column; gap: 10px; }
 .quest {
