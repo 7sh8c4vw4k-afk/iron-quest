@@ -1,4 +1,4 @@
-const CACHE = 'iron-quest-v4';
+const CACHE = 'iron-quest-v5';
 const ASSETS = [
   './',
   './index.html',
