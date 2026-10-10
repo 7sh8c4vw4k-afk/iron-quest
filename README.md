@@ -22,7 +22,7 @@ Gym / strength RPG PWA — Hevy-inspired logging with body-part RPG progression.
 `localStorage` key **`iron-quest-v1`** (backward-compatible; state `version` 3). New fields: widgets, bodyWeightLog, measurements, templates, customExercises. Existing workouts/XP/stats/PRs kept.
 
 ### PWA
-Service worker **`iron-quest-v8`**. Installable on iPhone (Add to Home Screen).
+Service worker **`iron-quest-v9`**. Installable on iPhone (Add to Home Screen).
 
 ## Tech
 Vanilla HTML / CSS / JS — dark UI with orange accents. No build step.

@@ -69,12 +69,23 @@
       </header>
 
       <div id="start-hub">
-        <button type="button" class="btn primary big cta" id="btn-empty-workout">Start an Empty Workout</button>
-        <div class="section-head templates-head">
-          <h2>Templates</h2>
-          <button type="button" class="btn ghost small" id="btn-new-template">+ Template</button>
+        <p class="start-hub-hint muted">Select routine and start workout tracking.</p>
+        <div id="resume-banner" class="resume-banner hidden" role="button" tabindex="0">
+          <div class="resume-banner-text">
+            <strong>Workout in progress</strong>
+            <span class="muted small" id="resume-banner-name">Tap to resume</span>
+          </div>
+          <button type="button" class="btn primary small" id="btn-resume-workout">Resume</button>
         </div>
-        <div id="templates-grid" class="templates-grid"></div>
+        <button type="button" class="freeform-btn" id="btn-empty-workout">
+          <span class="freeform-label">Free Form Workout</span>
+          <span class="muted small">Start with no exercises</span>
+        </button>
+        <div class="section-head templates-head routines-head">
+          <h2>Custom routines</h2>
+          <button type="button" class="btn ghost small" id="btn-new-template">+ Routine</button>
+        </div>
+        <div id="templates-grid" class="routines-list" role="list"></div>
       </div>
 
       <div id="session-active" class="hidden">
@@ -167,11 +178,11 @@
       <section class="card">
         <h3>About</h3>
         <p class="muted small">Iron Quest stores everything locally in <code>iron-quest-v1</code>. Install from Share → Add to Home Screen on iPhone.</p>
-        <p class="muted small">Version 2.2 · Hevy-style tabs · Body-part RPG · SW iron-quest-v8</p>
+        <p class="muted small">Version 2.3 · Hevy-style tabs · Body-part RPG · SW iron-quest-v9</p>
       </section>
       <section class="card danger-zone">
         <h3>Reset</h3>
-        <p class="muted small">Wipes all workouts, XP, stats, PRs, streak, templates, and measurements. Cannot undo.</p>
+        <p class="muted small">Wipes all workouts, XP, stats, PRs, streak, routines, and measurements. Cannot undo.</p>
         <button type="button" class="btn danger" id="btn-reset">Reset all data…</button>
       </section>
     </main>
@@ -239,7 +250,7 @@
 
   <dialog id="template-dialog">
     <div class="dialog-body">
-      <h3 id="template-dlg-title">New template</h3>
+      <h3 id="template-dlg-title">New routine</h3>
       <label class="field">
         <span>Name</span>
         <input type="text" id="template-name" maxlength="40" placeholder="e.g. Push A" />
@@ -253,6 +264,22 @@
     </div>
   </dialog>
 
+
+
+  <div id="routine-menu-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="routine-menu-title" hidden>
+    <div class="modal-backdrop" data-close-modal="routine-menu-modal"></div>
+    <div class="modal-sheet routine-menu-sheet">
+      <div class="sheet-head">
+        <h3 id="routine-menu-title">Routine</h3>
+        <button type="button" class="btn ghost small" id="routine-menu-close">Close</button>
+      </div>
+      <div class="routine-menu-actions">
+        <button type="button" class="routine-menu-item" id="routine-menu-edit">Edit</button>
+        <button type="button" class="routine-menu-item" id="routine-menu-duplicate">Duplicate</button>
+        <button type="button" class="routine-menu-item danger" id="routine-menu-delete">Delete</button>
+      </div>
+    </div>
+  </div>
 
   <div id="add-ex-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="add-ex-title" hidden>
     <div class="modal-backdrop" data-close-modal="add-ex-modal"></div>

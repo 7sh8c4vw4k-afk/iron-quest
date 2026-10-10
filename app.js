@@ -299,7 +299,10 @@
     templatePick: new Set(),
     previousView: 'profile',
     addExSearch: '',
-    addExToDraftAfterCreate: false
+    addExToDraftAfterCreate: false,
+    sessionOpen: false,
+    editingTemplateId: null,
+    menuTemplateId: null
   };
 
   function load() {
@@ -678,7 +681,16 @@
         sets: makeEmptySets()
       }))
     };
+    ui.sessionOpen = true;
     save();
+    showView('start');
+    renderStartView();
+    scrollToActiveSession();
+  }
+
+  function openActiveSession() {
+    if (!state.draft) return;
+    ui.sessionOpen = true;
     showView('start');
     renderStartView();
     scrollToActiveSession();
@@ -718,6 +730,7 @@
     workout.xpAwarded = gained;
     const questBonus = claimQuestsIfNeeded();
     state.draft = null;
+    ui.sessionOpen = false;
     save();
 
     let msg = `+${gained} XP`;
@@ -875,7 +888,7 @@
     if (name === 'history') renderHistory();
     if (name === 'start') {
       renderStartView();
-      if (state.draft) scrollToActiveSession();
+      if (state.draft && ui.sessionOpen) scrollToActiveSession();
     }
     if (name === 'exercises') renderExercisesLib();
     if (name === 'measure') renderMeasure();
@@ -1038,7 +1051,8 @@
     const hub = $('start-hub');
     const active = $('session-active');
     const header = $('start-header');
-    if (state.draft) {
+    const showSession = !!(state.draft && ui.sessionOpen);
+    if (showSession) {
       hub.classList.add('hidden');
       active.classList.remove('hidden');
       if (header) header.classList.add('hidden');
@@ -1051,25 +1065,38 @@
       hub.classList.remove('hidden');
       active.classList.add('hidden');
       if (header) header.classList.remove('hidden');
+      const banner = $('resume-banner');
+      if (banner) {
+        if (state.draft) {
+          banner.classList.remove('hidden');
+          const nameEl = $('resume-banner-name');
+          if (nameEl) nameEl.textContent = (state.draft.name || state.draft.type || 'Workout') + ' · Tap to resume';
+        } else {
+          banner.classList.add('hidden');
+        }
+      }
       renderTemplates();
     }
   }
 
   function renderTemplates() {
     const grid = $('templates-grid');
-    grid.innerHTML = (state.templates || []).map((t) => {
-      const preview = (t.exercises || []).slice(0, 3).join(', ');
-      const more = (t.exercises || []).length > 3 ? '…' : '';
-      return `<div class="template-card" data-id="${escapeHtml(t.id)}">
-        <strong>${escapeHtml(t.name)}</strong>
-        <div class="muted">${escapeHtml(preview)}${more || (!preview ? 'No exercises' : '')}</div>
-        <div class="muted">${(t.exercises || []).length} exercises</div>
-        <div class="tmpl-actions">
-          <button type="button" class="btn primary small btn-start-tmpl" data-id="${escapeHtml(t.id)}">Start</button>
-          <button type="button" class="btn ghost small btn-del-tmpl" data-id="${escapeHtml(t.id)}">Delete</button>
-        </div>
+    if (!grid) return;
+    const list = state.templates || [];
+    if (!list.length) {
+      grid.innerHTML = '<p class="muted routines-list-empty">No custom routines yet. Tap + Routine.</p>';
+      return;
+    }
+    grid.innerHTML = list.map((t) => {
+      const count = (t.exercises || []).length;
+      return `<div class="routine-row" role="listitem" data-id="${escapeHtml(t.id)}">
+        <button type="button" class="routine-row-main btn-start-tmpl" data-id="${escapeHtml(t.id)}">
+          <strong>${escapeHtml(t.name)}</strong>
+          <span class="muted">${count} exercise${count === 1 ? '' : 's'}</span>
+        </button>
+        <button type="button" class="routine-menu-btn btn-routine-menu" data-id="${escapeHtml(t.id)}" aria-label="Routine options">⋯</button>
       </div>`;
-    }).join('') || '<p class="muted">No templates yet. Tap + Template.</p>';
+    }).join('');
   }
 
   function partTagsHtml(map) {
@@ -1290,14 +1317,52 @@
     setTimeout(() => { if (input) input.focus(); }, 80);
   }
 
-  function openTemplateDialog() {
+  function openTemplateDialog(editId) {
+    ui.editingTemplateId = editId || null;
     ui.templatePick = new Set();
-    $('template-name').value = '';
+    const existing = editId ? (state.templates || []).find((t) => t.id === editId) : null;
+    if (existing) {
+      (existing.exercises || []).forEach((n) => ui.templatePick.add(n));
+      $('template-name').value = existing.name || '';
+      const title = $('template-dlg-title');
+      if (title) title.textContent = 'Edit routine';
+    } else {
+      $('template-name').value = '';
+      const title = $('template-dlg-title');
+      if (title) title.textContent = 'New routine';
+    }
     const pick = $('template-ex-pick');
     pick.innerHTML = allExercises().slice().sort((a, b) => a.name.localeCompare(b.name)).map((e) =>
-      `<button type="button" class="chip" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`
+      `<button type="button" class="chip ${ui.templatePick.has(e.name) ? 'selected' : ''}" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`
     ).join('');
     safeShowDialog($('template-dialog'));
+  }
+
+  function openRoutineMenu(id) {
+    const t = (state.templates || []).find((x) => x.id === id);
+    if (!t) return;
+    ui.menuTemplateId = id;
+    const title = $('routine-menu-title');
+    if (title) title.textContent = t.name;
+    openModal('routine-menu-modal');
+  }
+
+  function closeRoutineMenu() {
+    closeModal('routine-menu-modal');
+    ui.menuTemplateId = null;
+  }
+
+  function duplicateRoutine(id) {
+    const t = (state.templates || []).find((x) => x.id === id);
+    if (!t) return;
+    state.templates.push({
+      id: 'tmpl-' + Date.now(),
+      name: (t.name || 'Routine') + ' (copy)',
+      exercises: (t.exercises || []).slice()
+    });
+    save();
+    renderTemplates();
+    toast('Routine duplicated');
   }
 
   function openNewExerciseDialog() {
@@ -1340,13 +1405,12 @@
     bindSafe('profile-start', () => {
       safeOn('btn-profile-start', 'click', () => {
         if (state.draft) {
-          showView('start');
-          renderStartView();
-          scrollToActiveSession();
+          openActiveSession();
           toast('Resuming workout');
           return;
         }
-        startWorkout({ type: 'Custom', name: 'Empty Workout', exercises: [] });
+        showView('start');
+        renderStartView();
       });
     });
 
@@ -1376,13 +1440,36 @@
 
     bindSafe('empty-workout', () => {
       safeOn('btn-empty-workout', 'click', () => {
-        startWorkout({ type: 'Custom', name: 'Empty Workout', exercises: [] });
+        if (state.draft) {
+          toast('Finish or discard the current workout first');
+          return;
+        }
+        startWorkout({ type: 'Custom', name: 'Free Form Workout', exercises: [] });
+      });
+      const resume = () => {
+        if (!state.draft) return;
+        openActiveSession();
+        toast('Resuming workout');
+      };
+      safeOn('btn-resume-workout', 'click', (e) => {
+        e.stopPropagation();
+        resume();
+      });
+      safeOn('resume-banner', 'click', resume);
+      safeOn('resume-banner', 'keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          resume();
+        }
       });
     });
 
     bindSafe('templates', () => {
-      safeOn('btn-new-template', 'click', openTemplateDialog);
-      safeOn('template-cancel', 'click', () => safeCloseDialog($('template-dialog')));
+      safeOn('btn-new-template', 'click', () => openTemplateDialog(null));
+      safeOn('template-cancel', 'click', () => {
+        ui.editingTemplateId = null;
+        safeCloseDialog($('template-dialog'));
+      });
       safeOn('template-ex-pick', 'click', (e) => {
         const chip = e.target.closest('.chip');
         if (!chip) return;
@@ -1399,40 +1486,82 @@
         const name = ($('template-name') && $('template-name').value.trim()) || '';
         if (!name) { toast('Name required'); return; }
         if (!ui.templatePick.size) { toast('Pick at least one exercise'); return; }
+        const exercises = [...ui.templatePick];
+        if (ui.editingTemplateId) {
+          const t = state.templates.find((x) => x.id === ui.editingTemplateId);
+          if (t) {
+            t.name = name;
+            t.exercises = exercises;
+          }
+          ui.editingTemplateId = null;
+          save();
+          safeCloseDialog($('template-dialog'));
+          renderTemplates();
+          toast('Routine updated');
+          return;
+        }
         state.templates.push({
           id: 'tmpl-' + Date.now(),
           name,
-          exercises: [...ui.templatePick]
+          exercises
         });
         save();
         safeCloseDialog($('template-dialog'));
         renderTemplates();
-        toast('Template saved');
+        toast('Routine saved');
       });
       safeOn('templates-grid', 'click', async (e) => {
+        const menuBtn = e.target.closest('.btn-routine-menu');
+        if (menuBtn) {
+          e.stopPropagation();
+          openRoutineMenu(menuBtn.getAttribute('data-id') || menuBtn.dataset.id);
+          return;
+        }
         const start = e.target.closest('.btn-start-tmpl');
         if (start) {
+          if (state.draft) {
+            toast('Finish or discard the current workout first');
+            return;
+          }
           const t = state.templates.find((x) => x.id === (start.getAttribute('data-id') || start.dataset.id));
           if (!t) return;
           startWorkout({ type: 'Custom', name: t.name, exercises: t.exercises.slice() });
-          return;
         }
-        const del = e.target.closest('.btn-del-tmpl');
-        if (del) {
-          const ok = await confirmDialog('Delete template?', 'This cannot be undone.');
-          if (!ok) return;
-          const id = del.getAttribute('data-id') || del.dataset.id;
-          state.templates = state.templates.filter((x) => x.id !== id);
-          save();
-          renderTemplates();
-          toast('Template deleted');
-        }
+      });
+      safeOn('routine-menu-close', 'click', closeRoutineMenu);
+      const routineModal = $('routine-menu-modal');
+      if (routineModal) {
+        routineModal.addEventListener('click', (e) => {
+          if (e.target.closest('[data-close-modal="routine-menu-modal"]')) closeRoutineMenu();
+        });
+      }
+      safeOn('routine-menu-edit', 'click', () => {
+        const id = ui.menuTemplateId;
+        closeRoutineMenu();
+        if (id) openTemplateDialog(id);
+      });
+      safeOn('routine-menu-duplicate', 'click', () => {
+        const id = ui.menuTemplateId;
+        closeRoutineMenu();
+        if (id) duplicateRoutine(id);
+      });
+      safeOn('routine-menu-delete', 'click', async () => {
+        const id = ui.menuTemplateId;
+        closeRoutineMenu();
+        if (!id) return;
+        const ok = await confirmDialog('Delete routine?', 'This cannot be undone.');
+        if (!ok) return;
+        state.templates = state.templates.filter((x) => x.id !== id);
+        save();
+        renderTemplates();
+        toast('Routine deleted');
       });
     });
 
     bindSafe('workout-back', () => {
       safeOn('btn-workout-back', 'click', () => {
-        if (state.draft) toast('Draft saved — tap + or Start Workout to resume');
+        ui.sessionOpen = false;
+        if (state.draft) toast('Draft saved — resume from Start or Profile');
         showView('profile');
       });
     });
@@ -1545,6 +1674,7 @@
         const ok = await confirmDialog('Discard session?', 'Unsaved sets will be lost.');
         if (!ok) return;
         state.draft = null;
+        ui.sessionOpen = false;
         save();
         renderStartView();
         toast('Session discarded');
@@ -1676,9 +1806,10 @@
         renderProfile();
       });
       safeOn('btn-reset', 'click', async () => {
-        const ok = await confirmDialog('Reset all data?', 'This wipes workouts, XP, stats, PRs, streak, templates, and measurements. Cannot undo.');
+        const ok = await confirmDialog('Reset all data?', 'This wipes workouts, XP, stats, PRs, streak, routines, and measurements. Cannot undo.');
         if (!ok) return;
         state = defaultState();
+        ui.sessionOpen = false;
         save();
         toast('Data reset');
         showView('profile');
