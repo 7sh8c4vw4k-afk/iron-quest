@@ -9,7 +9,7 @@ Gym / strength RPG PWA — Hevy-inspired logging with body-part RPG progression.
 ### Bottom nav (5 tabs)
 1. **Profile** — level/XP, weekly streak, compact body-part stats, dashboard widgets (+ Widget toggles)
 2. **History** — chronological workouts with exercise summary + XP; PR list
-3. **Start (+)** — empty workout + template grid (Back / Chest / Leg / Shoulder / Grip Test); searchable add-exercise picker; create custom templates
+3. **Start (+)** — Free Form Workout + custom routines list (Back / Chest / Leg / Shoulder / Grip Test); ⋯ Edit/Delete/Duplicate; searchable add-exercise picker; + Routine
 4. **Exercises** — searchable A–Z library (90 mapped lifts + customs), body-part & category filters, last/best performance
 5. **Measure** — body circumference list (cm, L/R where shown) + body weight log
 
