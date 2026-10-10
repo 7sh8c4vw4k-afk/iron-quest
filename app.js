@@ -297,7 +297,9 @@
     filterCat: '',
     measureTarget: null,
     templatePick: new Set(),
-    previousView: 'profile'
+    previousView: 'profile',
+    addExSearch: '',
+    addExToDraftAfterCreate: false
   };
 
   function load() {
@@ -969,8 +971,6 @@
       if (header) header.classList.remove('hidden');
       renderTemplates();
     }
-    const dl = $('ex-library');
-    dl.innerHTML = allExercises().map((e) => `<option value="${escapeHtml(e.name)}"></option>`).join('');
   }
 
   function renderTemplates() {
@@ -1004,7 +1004,7 @@
   function renderActiveExercises() {
     const list = $('exercise-list');
     if (!state.draft.exercises.length) {
-      list.innerHTML = '<p class="muted small">Add exercises from the library or type a custom name.</p>';
+      list.innerHTML = '<p class="muted small">Tap + Add Exercise to pick from the library.</p>';
       return;
     }
     list.innerHTML = state.draft.exercises.map((ex, ei) => {
@@ -1152,6 +1152,59 @@
     renderHistory();
   }
 
+
+  function addExerciseToDraft(name) {
+    if (!state.draft) return;
+    const n = String(name || '').trim();
+    if (!n) return;
+    state.draft.exercises.push({ name: n, notes: '', rpe: '', sets: makeEmptySets() });
+    save();
+    renderActiveExercises();
+    toast('Added ' + n);
+  }
+
+  function filteredAddExList(query) {
+    const q = String(query || '').trim().toLowerCase();
+    let list = allExercises().slice().sort((a, b) => a.name.localeCompare(b.name));
+    if (q) list = list.filter((e) => e.name.toLowerCase().includes(q));
+    return list;
+  }
+
+  function renderAddExPicker() {
+    const listEl = $('add-ex-list');
+    if (!listEl) return;
+    const list = filteredAddExList(ui.addExSearch);
+    const customBtn = $('add-ex-custom');
+    const q = ui.addExSearch.trim();
+    if (customBtn) {
+      customBtn.textContent = q ? `Create “${q}”…` : 'Create custom…';
+    }
+    if (!list.length) {
+      listEl.innerHTML = `<p class="add-ex-empty">No matches.${q ? ' Use Create below to add it.' : ''}</p>`;
+      return;
+    }
+    listEl.innerHTML = list.map((ex) => {
+      const primary = (ex.primary || []).map((p) => STAT_LABELS[p] || p).join(', ') || '—';
+      return `<button type="button" class="add-ex-pick-row" role="option" data-name="${escapeHtml(ex.name)}">
+        <div>
+          <div class="name">${escapeHtml(ex.name)}</div>
+          <div class="part">${escapeHtml(primary)}</div>
+        </div>
+        <span class="chev" aria-hidden="true">+</span>
+      </button>`;
+    }).join('');
+  }
+
+  function openAddExercisePicker() {
+    if (!state.draft) return;
+    ui.addExSearch = '';
+    const input = $('add-ex-search');
+    if (input) input.value = '';
+    renderAddExPicker();
+    $('add-ex-dialog').showModal();
+    setTimeout(() => { if (input) input.focus(); }, 50);
+  }
+
   function openTemplateDialog() {
     ui.templatePick = new Set();
     $('template-name').value = '';
@@ -1261,17 +1314,40 @@
       showView('profile');
     });
 
-    $('btn-add-ex').addEventListener('click', () => {
-      if (!state.draft) return;
-      const name = $('ex-search').value.trim();
-      if (!name) return;
-      state.draft.exercises.push({ name, notes: '', rpe: '', sets: makeEmptySets() });
-      $('ex-search').value = '';
-      save();
-      renderActiveExercises();
+    $('btn-add-ex').addEventListener('click', openAddExercisePicker);
+
+    $('add-ex-close').addEventListener('click', () => $('add-ex-dialog').close());
+    $('add-ex-search').addEventListener('input', () => {
+      ui.addExSearch = $('add-ex-search').value;
+      renderAddExPicker();
     });
-    $('ex-search').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); $('btn-add-ex').click(); }
+    $('add-ex-search').addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const list = filteredAddExList(ui.addExSearch);
+      if (list.length === 1) {
+        addExerciseToDraft(list[0].name);
+        $('add-ex-dialog').close();
+      } else if (ui.addExSearch.trim()) {
+        $('add-ex-custom').click();
+      }
+    });
+    $('add-ex-list').addEventListener('click', (e) => {
+      const row = e.target.closest('.add-ex-pick-row');
+      if (!row) return;
+      addExerciseToDraft(row.dataset.name);
+      $('add-ex-dialog').close();
+    });
+    $('add-ex-custom').addEventListener('click', () => {
+      const q = ui.addExSearch.trim();
+      if (q) {
+        addExerciseToDraft(q);
+        $('add-ex-dialog').close();
+        return;
+      }
+      ui.addExToDraftAfterCreate = !!state.draft;
+      $('add-ex-dialog').close();
+      openNewExerciseDialog();
     });
 
     $('exercise-list').addEventListener('click', (e) => {
@@ -1356,7 +1432,10 @@
     });
 
     $('btn-new-exercise').addEventListener('click', openNewExerciseDialog);
-    $('new-ex-cancel').addEventListener('click', () => $('new-ex-dialog').close());
+    $('new-ex-cancel').addEventListener('click', () => {
+      ui.addExToDraftAfterCreate = false;
+      $('new-ex-dialog').close();
+    });
     $('new-ex-save').addEventListener('click', () => {
       const name = $('new-ex-name').value.trim();
       if (!name) { toast('Name required'); return; }
@@ -1377,7 +1456,12 @@
       save();
       $('new-ex-dialog').close();
       renderExercisesLib();
-      toast('Exercise added');
+      if (ui.addExToDraftAfterCreate && state.draft) {
+        ui.addExToDraftAfterCreate = false;
+        addExerciseToDraft(name);
+      } else {
+        toast('Exercise added');
+      }
     });
 
     $('measure-list').addEventListener('click', (e) => {

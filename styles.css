@@ -355,8 +355,90 @@ code { background: var(--bg); padding: 1px 5px; border-radius: 4px; font-size: 0
   padding: 4px 8px;
 }
 
-.add-ex { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; margin-bottom: 12px; }
-.add-ex .field { margin: 0; }
+.add-ex { margin-bottom: 12px; }
+.add-ex .btn.big { margin-top: 0; }
+
+dialog.sheet {
+  max-width: 480px;
+  width: calc(100% - 16px);
+  max-height: min(88vh, 720px);
+  margin: auto auto max(8px, env(safe-area-inset-bottom, 8px));
+  border-radius: 18px 18px 14px 14px;
+  padding: 0;
+  overflow: hidden;
+}
+.add-ex-sheet {
+  display: flex;
+  flex-direction: column;
+  max-height: min(88vh, 720px);
+  padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  gap: 10px;
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sheet-head h3 { margin: 0; font-size: 1.05rem; }
+.add-ex-sheet .search-bar { margin: 0; }
+.add-ex-sheet .search-bar input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  padding: 12px 14px;
+  font-size: 1rem;
+}
+.add-ex-list {
+  flex: 1 1 auto;
+  min-height: 180px;
+  max-height: 52vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg2);
+}
+.add-ex-pick-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  background: transparent;
+  color: var(--text);
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  font: inherit;
+}
+.add-ex-pick-row:last-child { border-bottom: none; }
+.add-ex-pick-row:active,
+.add-ex-pick-row:focus-visible {
+  background: rgba(234, 88, 12, 0.18);
+  outline: none;
+}
+.add-ex-pick-row .name { font-weight: 600; font-size: 0.95rem; }
+.add-ex-pick-row .part { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+.add-ex-pick-row .chev {
+  color: var(--orange);
+  font-size: 1.1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.add-ex-empty {
+  padding: 24px 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+#add-ex-custom { margin-top: 2px; }
 
 .exercise-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
 .ex-card {

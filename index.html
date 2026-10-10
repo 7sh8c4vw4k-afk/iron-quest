@@ -87,12 +87,7 @@
             <span class="muted small" id="active-time">In progress</span>
           </div>
           <div class="add-ex">
-            <label class="field">
-              <span>Add exercise</span>
-              <input type="text" id="ex-search" list="ex-library" placeholder="Search or type name…" autocomplete="off" />
-              <datalist id="ex-library"></datalist>
-            </label>
-            <button type="button" class="btn secondary" id="btn-add-ex">Add</button>
+            <button type="button" class="btn secondary big" id="btn-add-ex">+ Add Exercise</button>
           </div>
           <div id="exercise-list" class="exercise-list"></div>
           <label class="field">
@@ -170,7 +165,7 @@
       <section class="card">
         <h3>About</h3>
         <p class="muted small">Iron Quest stores everything locally in <code>iron-quest-v1</code>. Install from Share → Add to Home Screen on iPhone.</p>
-        <p class="muted small">Version 2.0 · Hevy-style tabs · Body-part RPG · SW iron-quest-v6</p>
+        <p class="muted small">Version 2.1 · Hevy-style tabs · Body-part RPG · SW iron-quest-v7</p>
       </section>
       <section class="card danger-zone">
         <h3>Reset</h3>
@@ -252,6 +247,21 @@
         <button type="button" class="btn ghost" id="template-cancel">Cancel</button>
         <button type="button" class="btn primary" id="template-save">Save</button>
       </div>
+    </div>
+  </dialog>
+
+
+  <dialog id="add-ex-dialog" class="sheet">
+    <div class="dialog-body add-ex-sheet">
+      <div class="sheet-head">
+        <h3>Add exercise</h3>
+        <button type="button" class="btn ghost small" id="add-ex-close">Close</button>
+      </div>
+      <div class="search-bar">
+        <input type="search" id="add-ex-search" placeholder="Search exercises…" autocomplete="off" />
+      </div>
+      <div id="add-ex-list" class="add-ex-list" role="listbox" aria-label="Exercise library"></div>
+      <button type="button" class="btn ghost big" id="add-ex-custom">Create custom…</button>
     </div>
   </dialog>
 

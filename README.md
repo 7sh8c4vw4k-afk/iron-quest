@@ -9,7 +9,7 @@ Gym / strength RPG PWA — Hevy-inspired logging with body-part RPG progression.
 ### Bottom nav (5 tabs)
 1. **Profile** — level/XP, weekly streak, compact body-part stats, dashboard widgets (+ Widget toggles)
 2. **History** — chronological workouts with exercise summary + XP; PR list
-3. **Start (+)** — empty workout + template grid (Back / Chest / Leg / Shoulder / Grip Test); create custom templates
+3. **Start (+)** — empty workout + template grid (Back / Chest / Leg / Shoulder / Grip Test); searchable add-exercise picker; create custom templates
 4. **Exercises** — searchable A–Z library (90 mapped lifts + customs), body-part & category filters, last/best performance
 5. **Measure** — body circumference list (cm, L/R where shown) + body weight log
 
@@ -22,7 +22,7 @@ Gym / strength RPG PWA — Hevy-inspired logging with body-part RPG progression.
 `localStorage` key **`iron-quest-v1`** (backward-compatible; state `version` 3). New fields: widgets, bodyWeightLog, measurements, templates, customExercises. Existing workouts/XP/stats/PRs kept.
 
 ### PWA
-Service worker **`iron-quest-v6`**. Installable on iPhone (Add to Home Screen).
+Service worker **`iron-quest-v7`**. Installable on iPhone (Add to Home Screen).
 
 ## Tech
 Vanilla HTML / CSS / JS — dark UI with orange accents. No build step.
