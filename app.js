@@ -302,7 +302,13 @@
     addExToDraftAfterCreate: false,
     sessionOpen: false,
     editingTemplateId: null,
-    menuTemplateId: null
+    menuTemplateId: null,
+    logYear: new Date().getFullYear(),
+    logMonth: new Date().getMonth(),
+    logSelectedKey: localDateKey(new Date()),
+    logShowPrs: false,
+    logSwipeX: null,
+    logSwipeY: null
   };
 
   function load() {
@@ -870,7 +876,8 @@
     document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
     const map = {
       profile: 'view-profile',
-      history: 'view-history',
+      log: 'view-log',
+      history: 'view-log',
       start: 'view-start',
       exercises: 'view-exercises',
       measure: 'view-measure',
@@ -885,7 +892,7 @@
     });
     if (name !== 'settings') ui.previousView = name;
     if (name === 'profile') renderProfile();
-    if (name === 'history') renderHistory();
+    if (name === 'log' || name === 'history') renderLog();
     if (name === 'start') {
       renderStartView();
       if (state.draft && ui.sessionOpen) scrollToActiveSession();
@@ -1006,34 +1013,109 @@
     area.innerHTML = html;
   }
 
-  function renderHistory() {
-    const real = state.workouts.filter((w) => !w.isFreeze);
+  function workoutDateKeys() {
+    const set = new Set();
+    for (const w of state.workouts) {
+      if (w.isFreeze || !w.completedAt) continue;
+      set.add(localDateKey(new Date(w.completedAt)));
+    }
+    return set;
+  }
+
+  function workoutsForDateKey(dateKey) {
+    return state.workouts.filter(
+      (w) => !w.isFreeze && w.completedAt && localDateKey(new Date(w.completedAt)) === dateKey
+    );
+  }
+
+  function shiftLogMonth(delta) {
+    let y = ui.logYear;
+    let m = ui.logMonth + delta;
+    while (m < 0) { m += 12; y -= 1; }
+    while (m > 11) { m -= 12; y += 1; }
+    ui.logYear = y;
+    ui.logMonth = m;
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const sel = ui.logSelectedKey.split('-').map(Number);
+    const day = Math.min(sel[2] || 1, daysInMonth);
+    ui.logSelectedKey = localDateKey(new Date(y, m, day));
+    renderLog();
+  }
+
+  function renderLogCalendar() {
+    const title = $('log-month-title');
+    if (title) {
+      title.textContent = new Date(ui.logYear, ui.logMonth, 1).toLocaleDateString(undefined, {
+        month: 'long',
+        year: 'numeric'
+      });
+    }
+    const cal = $('log-calendar');
+    if (!cal) return;
+    const keys = workoutDateKeys();
+    const todayKey = localDateKey(new Date());
+    const first = new Date(ui.logYear, ui.logMonth, 1);
+    // Monday-first: Mon=0 … Sun=6
+    let startPad = (first.getDay() + 6) % 7;
+    const daysInMonth = new Date(ui.logYear, ui.logMonth + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < startPad; i++) {
+      cells.push('<button type="button" class="log-day empty" tabindex="-1" aria-hidden="true"></button>');
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = localDateKey(new Date(ui.logYear, ui.logMonth, d));
+      const selected = key === ui.logSelectedKey ? ' selected' : '';
+      const today = key === todayKey ? ' today' : '';
+      const has = keys.has(key) ? ' has-workout' : '';
+      cells.push(
+        `<button type="button" class="log-day${selected}${today}${has}" data-date="${key}" aria-label="${key}" aria-pressed="${key === ui.logSelectedKey}">` +
+        `<span class="day-num">${d}</span><span class="day-dot" aria-hidden="true"></span></button>`
+      );
+    }
+    cal.innerHTML = cells.join('');
+  }
+
+  function renderLogDayList() {
     const hl = $('history-list');
+    if (!hl) return;
+    const real = state.workouts.filter((w) => !w.isFreeze);
     if (!real.length) {
-      hl.innerHTML = '<span class="muted">No workouts yet.</span>';
-    } else {
-      hl.innerHTML = real.map((w) => {
-        const when = new Date(w.completedAt);
-        const exNames = (w.exercises || []).map((e) => e.name).slice(0, 4).join(', ');
-        const more = (w.exercises || []).length > 4 ? '…' : '';
-        const detail = (w.exercises || []).map((e) => {
-          const done = e.sets.filter((s) => s.done);
-          return `${e.name}: ${done.map((s) => `${s.weight || 0}×${s.reps || 0}`).join(', ') || '—'}`;
-        }).join('\n');
-        return `<div class="hist-item" data-id="${w.id}">
+      hl.innerHTML = '<p class="log-empty">This screen is dedicated for workout records. It will stay empty until you save your first workout record.</p>';
+      return;
+    }
+    const dayWorkouts = workoutsForDateKey(ui.logSelectedKey);
+    if (!dayWorkouts.length) {
+      hl.innerHTML = '<p class="log-empty">No workouts on this day.</p>';
+      return;
+    }
+    hl.innerHTML = dayWorkouts.map((w) => {
+      const when = new Date(w.completedAt);
+      const exNames = (w.exercises || []).map((e) => e.name).slice(0, 4).join(', ');
+      const more = (w.exercises || []).length > 4 ? '…' : '';
+      const detail = (w.exercises || []).map((e) => {
+        const done = (e.sets || []).filter((s) => s.done);
+        return `${e.name}: ${done.map((s) => `${s.weight || 0}×${s.reps || 0}`).join(', ') || '—'}`;
+      }).join('\n');
+      return `<div class="hist-item" data-id="${w.id}">
           <div class="left">
             <strong>${escapeHtml(w.name)}</strong>
-            <div class="muted small">${when.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${escapeHtml(w.type)}</div>
+            <div class="muted small">${when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} · ${escapeHtml(w.type || '')}</div>
             <div class="muted small">${escapeHtml(exNames)}${more}</div>
             <div class="hist-detail hidden" data-detail="${w.id}">${escapeHtml(detail)}${w.notes ? '\n\n' + escapeHtml(w.notes) : ''}</div>
           </div>
           <div class="muted small">+${w.xpAwarded || 0} XP</div>
         </div>`;
-      }).join('');
-    }
+    }).join('');
+  }
 
-    const prs = Object.entries(state.prs).sort((a, b) => (b[1].e1rm || 0) - (a[1].e1rm || 0));
+  function renderLogPrs() {
     const pl = $('pr-list');
+    const btn = $('btn-toggle-prs');
+    if (!pl) return;
+    if (btn) btn.textContent = ui.logShowPrs ? 'Hide' : 'Show';
+    pl.classList.toggle('hidden', !ui.logShowPrs);
+    if (!ui.logShowPrs) return;
+    const prs = Object.entries(state.prs).sort((a, b) => (b[1].e1rm || 0) - (a[1].e1rm || 0));
     if (!prs.length) {
       pl.innerHTML = '<span class="muted">PRs appear when you set a best set.</span>';
     } else {
@@ -1045,6 +1127,16 @@
           <div><strong>${p.weight > 0 ? p.weight + ' × ' + p.reps : p.reps + ' reps'}</strong></div>
         </div>`).join('');
     }
+  }
+
+  function renderLog() {
+    renderLogCalendar();
+    renderLogDayList();
+    renderLogPrs();
+  }
+
+  function renderHistory() {
+    renderLog();
   }
 
   function renderStartView() {
@@ -1692,6 +1784,37 @@
         const det = item.querySelector('.hist-detail');
         if (det) det.classList.toggle('hidden');
       });
+      safeOn('log-calendar', 'click', (e) => {
+        const day = e.target.closest('.log-day');
+        if (!day || day.classList.contains('empty')) return;
+        const key = day.getAttribute('data-date');
+        if (!key) return;
+        ui.logSelectedKey = key;
+        renderLog();
+      });
+      safeOn('log-prev-month', 'click', () => shiftLogMonth(-1));
+      safeOn('log-next-month', 'click', () => shiftLogMonth(1));
+      safeOn('btn-toggle-prs', 'click', () => {
+        ui.logShowPrs = !ui.logShowPrs;
+        renderLogPrs();
+      });
+      const wrap = $('log-calendar-wrap');
+      if (wrap) {
+        wrap.addEventListener('touchstart', (e) => {
+          if (!e.touches || !e.touches.length) return;
+          ui.logSwipeX = e.touches[0].clientX;
+          ui.logSwipeY = e.touches[0].clientY;
+        }, { passive: true });
+        wrap.addEventListener('touchend', (e) => {
+          if (ui.logSwipeX == null || !e.changedTouches || !e.changedTouches.length) return;
+          const dx = e.changedTouches[0].clientX - ui.logSwipeX;
+          const dy = e.changedTouches[0].clientY - ui.logSwipeY;
+          ui.logSwipeX = null;
+          ui.logSwipeY = null;
+          if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+          shiftLogMonth(dx < 0 ? 1 : -1);
+        }, { passive: true });
+      }
     });
 
     bindSafe('lib-filters', () => {

@@ -50,16 +50,33 @@
       <button type="button" class="btn ghost big" id="btn-add-widget">+ Widget</button>
     </main>
 
-    <main id="view-history" class="view">
-      <header class="page-header">
-        <h1>History</h1>
+    <main id="view-log" class="view">
+      <header class="log-header">
+        <button type="button" class="log-nav-btn" id="log-prev-month" aria-label="Previous month">‹</button>
+        <div class="log-header-center">
+          <h1 id="log-month-title">October 2026</h1>
+          <p class="log-hint">Swipe on calendar to see different month.</p>
+        </div>
+        <button type="button" class="log-nav-btn" id="log-next-month" aria-label="Next month">›</button>
       </header>
-      <section class="card flat">
-        <div id="history-list" class="history-list muted">No workouts yet.</div>
+
+      <section class="log-calendar-wrap" id="log-calendar-wrap">
+        <div class="log-weekdays" aria-hidden="true">
+          <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+        </div>
+        <div id="log-calendar" class="log-calendar" role="grid" aria-label="Workout calendar"></div>
       </section>
-      <section class="card">
-        <h2>Personal records</h2>
-        <div id="pr-list" class="pr-list muted">PRs appear when you set a best set.</div>
+
+      <section class="card flat log-day-section">
+        <div id="history-list" class="history-list muted"></div>
+      </section>
+
+      <section class="card log-pr-section">
+        <div class="section-head">
+          <h2>Personal records</h2>
+          <button type="button" class="btn ghost small" id="btn-toggle-prs">Show</button>
+        </div>
+        <div id="pr-list" class="pr-list muted hidden">PRs appear when you set a best set.</div>
       </section>
     </main>
 
@@ -178,7 +195,7 @@
       <section class="card">
         <h3>About</h3>
         <p class="muted small">Iron Quest stores everything locally in <code>iron-quest-v1</code>. Install from Share → Add to Home Screen on iPhone.</p>
-        <p class="muted small">Version 2.3 · Hevy-style tabs · Body-part RPG · SW iron-quest-v9</p>
+        <p class="muted small">Version 2.4 · Log calendar · Body-part RPG · SW iron-quest-v10</p>
       </section>
       <section class="card danger-zone">
         <h3>Reset</h3>
@@ -191,8 +208,17 @@
       <button type="button" class="tab active" data-view="profile">
         <span class="tab-icon">👤</span><span class="tab-label">Profile</span>
       </button>
-      <button type="button" class="tab" data-view="history">
-        <span class="tab-icon">📅</span><span class="tab-label">History</span>
+      <button type="button" class="tab" data-view="log">
+        <span class="tab-icon tab-icon-log" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="5" cy="7" r="1.6" fill="currentColor"/>
+            <rect x="9" y="6" width="11" height="2" rx="1" fill="currentColor"/>
+            <circle cx="5" cy="12" r="1.6" fill="currentColor"/>
+            <rect x="9" y="11" width="11" height="2" rx="1" fill="currentColor"/>
+            <circle cx="5" cy="17" r="1.6" fill="currentColor"/>
+            <rect x="9" y="16" width="11" height="2" rx="1" fill="currentColor"/>
+          </svg>
+        </span><span class="tab-label">Log</span>
       </button>
       <button type="button" class="tab tab-center" data-view="start" aria-label="Start">
         <span class="tab-plus">+</span>
