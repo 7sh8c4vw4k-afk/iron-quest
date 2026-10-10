@@ -873,7 +873,6 @@
   }
 
   function showView(name) {
-    document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
     const map = {
       profile: 'view-profile',
       log: 'view-log',
@@ -883,23 +882,53 @@
       measure: 'view-measure',
       settings: 'view-settings'
     };
-    const el = $(map[name]);
+    let resolved = name;
+    let el = $(map[resolved]);
+    // Stale SW-cached HTML may still have #view-history (or no log view).
+    if (!el && (resolved === 'log' || resolved === 'history')) {
+      el = $('view-history') || $('view-log');
+    }
+    if (!el) {
+      el = $('view-profile') || document.querySelector('.view');
+      resolved = 'profile';
+    }
     if (!el) return;
+
+    document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
     el.classList.add('active');
+    // Never leave zero .view.active (blank screen on iPhone PWA).
+    if (!document.querySelector('.view.active')) {
+      const fallback = $('view-profile') || document.querySelector('.view');
+      if (fallback) fallback.classList.add('active');
+    }
+
     document.querySelectorAll('.tab').forEach((t) => {
-      const tabView = t.dataset.view;
-      t.classList.toggle('active', tabView === name || (name === 'settings' && tabView === 'profile'));
+      const tabView = t.getAttribute('data-view') || t.dataset.view;
+      const logAlias = (resolved === 'log' || resolved === 'history') && tabView === 'log';
+      t.classList.toggle('active', tabView === resolved || logAlias || (resolved === 'settings' && tabView === 'profile'));
     });
-    if (name !== 'settings') ui.previousView = name;
-    if (name === 'profile') renderProfile();
-    if (name === 'log' || name === 'history') renderLog();
-    if (name === 'start') {
+    if (resolved !== 'settings') ui.previousView = resolved;
+    if (resolved === 'profile') renderProfile();
+    if (resolved === 'log' || resolved === 'history') {
+      try {
+        renderLog();
+      } catch (err) {
+        console.error('[Iron Quest] renderLog failed:', err);
+        const list = $('history-list');
+        if (list) {
+          list.innerHTML = '<p class="muted">Could not load log. Close and reopen the app to refresh.</p>';
+        } else {
+          el.insertAdjacentHTML('beforeend', '<p class="muted" style="padding:1rem">Could not load log. Close and reopen the app to refresh.</p>');
+        }
+      }
+    }
+    if (resolved === 'start') {
       renderStartView();
       if (state.draft && ui.sessionOpen) scrollToActiveSession();
     }
-    if (name === 'exercises') renderExercisesLib();
-    if (name === 'measure') renderMeasure();
-    if (name === 'settings') renderSettings();
+    if (resolved === 'exercises') renderExercisesLib();
+    if (resolved === 'measure') renderMeasure();
+    if (resolved === 'settings') renderSettings();
   }
 
   function confirmDialog(title, msg) {
@@ -1470,14 +1499,17 @@
 
   function bind() {
     bindSafe('tabs', () => {
-      document.querySelectorAll('.tab').forEach((t) => {
-        t.addEventListener('click', () => {
-          const view = t.getAttribute('data-view') || t.dataset.view;
-          showView(view);
-          if (view === 'start' && state.draft) {
-            scrollToActiveSession();
-          }
-        });
+      const tabbar = document.querySelector('.tabbar');
+      if (!tabbar) return;
+      tabbar.addEventListener('click', (e) => {
+        const t = e.target.closest('.tab');
+        if (!t || !tabbar.contains(t)) return;
+        const view = t.getAttribute('data-view') || t.dataset.view;
+        if (!view) return;
+        showView(view);
+        if (view === 'start' && state.draft) {
+          scrollToActiveSession();
+        }
       });
     });
 

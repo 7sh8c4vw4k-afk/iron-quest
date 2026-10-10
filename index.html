@@ -12,7 +12,8 @@
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
   <title>Iron Quest</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <!-- cache bust v11 -->
+  <link rel="stylesheet" href="./styles.css?v=11" />
 </head>
 <body>
   <div id="app">
@@ -50,6 +51,7 @@
       <button type="button" class="btn ghost big" id="btn-add-widget">+ Widget</button>
     </main>
 
+    <!-- log view (formerly view-history); keep id="view-log" for cache-bust clients -->
     <main id="view-log" class="view">
       <header class="log-header">
         <button type="button" class="log-nav-btn" id="log-prev-month" aria-label="Previous month">‹</button>
@@ -195,7 +197,7 @@
       <section class="card">
         <h3>About</h3>
         <p class="muted small">Iron Quest stores everything locally in <code>iron-quest-v1</code>. Install from Share → Add to Home Screen on iPhone.</p>
-        <p class="muted small">Version 2.4 · Log calendar · Body-part RPG · SW iron-quest-v10</p>
+        <p class="muted small">Version 2.5 · Log calendar · Body-part RPG · SW iron-quest-v11</p>
       </section>
       <section class="card danger-zone">
         <h3>Reset</h3>
@@ -347,6 +349,6 @@
     </div>
   </div>
 
-  <script src="./app.js"></script>
+  <script src="./app.js?v=11"></script>
 </body>
 </html>
