@@ -358,55 +358,97 @@ code { background: var(--bg); padding: 1px 5px; border-radius: 4px; font-size: 0
 .add-ex { margin-bottom: 12px; }
 .add-ex .btn.big { margin-top: 0; }
 
-dialog.sheet {
-  max-width: 480px;
-  width: calc(100% - 16px);
-  max-height: min(88vh, 720px);
-  margin: auto auto max(8px, env(safe-area-inset-bottom, 8px));
-  border-radius: 18px 18px 14px 14px;
+/* Custom modal overlays — reliable on iOS Safari/PWA (no <dialog>.showModal) */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   padding: 0;
+}
+.modal[hidden] { display: none !important; }
+.modal.open { display: flex; }
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  -webkit-tap-highlight-color: transparent;
+}
+.modal-sheet,
+.modal-panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 480px;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.5);
+}
+.modal-sheet {
+  max-height: min(92vh, 780px);
+  border-radius: 18px 18px 0 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+}
+.modal-panel {
+  margin: auto 16px max(16px, env(safe-area-inset-bottom, 16px));
+  border-radius: 16px;
+  max-height: min(85vh, 560px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .add-ex-sheet {
   display: flex;
   flex-direction: column;
-  max-height: min(88vh, 720px);
+  max-height: min(92vh, 780px);
   padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
   gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
 }
 .sheet-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-shrink: 0;
 }
 .sheet-head h3 { margin: 0; font-size: 1.05rem; }
-.add-ex-sheet .search-bar { margin: 0; }
+.add-ex-sheet .search-bar { margin: 0; flex-shrink: 0; }
 .add-ex-sheet .search-bar input {
   width: 100%;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
   color: var(--text);
-  padding: 12px 14px;
+  padding: 14px 14px;
   font-size: 1rem;
+  min-height: 48px;
 }
 .add-ex-list {
   flex: 1 1 auto;
-  min-height: 180px;
-  max-height: 52vh;
+  min-height: 220px;
+  max-height: none;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg2);
+  overscroll-behavior: contain;
 }
 .add-ex-pick-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  padding: 14px 12px;
+  padding: 16px 14px;
+  min-height: 56px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   text-align: left;
@@ -417,6 +459,8 @@ dialog.sheet {
   border-right: none;
   border-top: none;
   font: inherit;
+  -webkit-tap-highlight-color: rgba(234, 88, 12, 0.25);
+  touch-action: manipulation;
 }
 .add-ex-pick-row:last-child { border-bottom: none; }
 .add-ex-pick-row:active,
@@ -424,21 +468,35 @@ dialog.sheet {
   background: rgba(234, 88, 12, 0.18);
   outline: none;
 }
-.add-ex-pick-row .name { font-weight: 600; font-size: 0.95rem; }
-.add-ex-pick-row .part { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+.add-ex-pick-row .name { font-weight: 600; font-size: 1rem; }
+.add-ex-pick-row .part { font-size: 0.75rem; color: var(--muted); margin-top: 3px; }
 .add-ex-pick-row .chev {
   color: var(--orange);
-  font-size: 1.1rem;
+  font-size: 1.35rem;
   font-weight: 700;
   flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(234, 88, 12, 0.15);
 }
 .add-ex-empty {
-  padding: 24px 14px;
+  padding: 28px 14px;
   text-align: center;
   color: var(--muted);
   font-size: 0.9rem;
 }
-#add-ex-custom { margin-top: 2px; }
+#add-ex-custom {
+  margin-top: 2px;
+  flex-shrink: 0;
+  min-height: 48px;
+}
+body.modal-open {
+  overflow: hidden;
+  touch-action: none;
+}
 
 .exercise-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
 .ex-card {
@@ -639,19 +697,38 @@ dialog.sheet {
 .tab-center {
   flex: 0 0 auto;
   max-width: none;
-  width: 56px;
-  height: 56px;
-  margin: 0 4px 4px;
-  border-radius: 50%;
+  width: 58px;
+  min-height: 62px;
+  margin: 0 4px 2px;
+  border-radius: 18px;
   background: linear-gradient(145deg, var(--amber), var(--orange));
   color: #0a0a0a;
   box-shadow: 0 4px 18px rgba(234,88,12,0.45);
-  padding: 0;
-  display: grid;
-  place-items: center;
+  padding: 6px 4px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
 }
 .tab-center.active { box-shadow: 0 0 0 3px rgba(245,158,11,0.35), 0 4px 18px rgba(234,88,12,0.45); }
-.tab-plus { font-size: 2rem; font-weight: 300; line-height: 1; margin-top: -2px; }
+.tab-plus { font-size: 1.75rem; font-weight: 300; line-height: 1; margin-top: -2px; }
+.tab-label-start {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #0a0a0a;
+  line-height: 1;
+  margin-top: 1px;
+}
+.tab-center.active .tab-label-start { color: #0a0a0a; }
+
+.profile-start-cta {
+  margin: 4px 0 14px;
+  position: sticky;
+  top: calc(var(--safe-t) + 52px);
+  z-index: 9;
+}
 
 .toast {
   position: fixed;
@@ -707,3 +784,14 @@ dialog::backdrop { background: rgba(0,0,0,0.7); }
 @media (min-width: 480px) {
   #app { padding-left: 20px; padding-right: 20px; }
 }
+
+dialog.fallback-open {
+  display: block;
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 90;
+  margin: 0;
+}
+dialog.fallback-open::backdrop { display: none; }

@@ -36,6 +36,8 @@
         </div>
       </section>
 
+      <button type="button" class="btn primary big cta profile-start-cta" id="btn-profile-start">Start Workout</button>
+
       <section class="card">
         <div class="section-head">
           <h2>Body stats</h2>
@@ -165,7 +167,7 @@
       <section class="card">
         <h3>About</h3>
         <p class="muted small">Iron Quest stores everything locally in <code>iron-quest-v1</code>. Install from Share → Add to Home Screen on iPhone.</p>
-        <p class="muted small">Version 2.1 · Hevy-style tabs · Body-part RPG · SW iron-quest-v7</p>
+        <p class="muted small">Version 2.2 · Hevy-style tabs · Body-part RPG · SW iron-quest-v8</p>
       </section>
       <section class="card danger-zone">
         <h3>Reset</h3>
@@ -181,8 +183,9 @@
       <button type="button" class="tab" data-view="history">
         <span class="tab-icon">📅</span><span class="tab-label">History</span>
       </button>
-      <button type="button" class="tab tab-center" data-view="start">
+      <button type="button" class="tab tab-center" data-view="start" aria-label="Start">
         <span class="tab-plus">+</span>
+        <span class="tab-label tab-label-start">Start</span>
       </button>
       <button type="button" class="tab" data-view="exercises">
         <span class="tab-icon">🏋️</span><span class="tab-label">Exercises</span>
@@ -251,10 +254,11 @@
   </dialog>
 
 
-  <dialog id="add-ex-dialog" class="sheet">
-    <div class="dialog-body add-ex-sheet">
+  <div id="add-ex-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="add-ex-title" hidden>
+    <div class="modal-backdrop" data-close-modal="add-ex-modal"></div>
+    <div class="modal-sheet add-ex-sheet">
       <div class="sheet-head">
-        <h3>Add exercise</h3>
+        <h3 id="add-ex-title">Add exercise</h3>
         <button type="button" class="btn ghost small" id="add-ex-close">Close</button>
       </div>
       <div class="search-bar">
@@ -263,11 +267,12 @@
       <div id="add-ex-list" class="add-ex-list" role="listbox" aria-label="Exercise library"></div>
       <button type="button" class="btn ghost big" id="add-ex-custom">Create custom…</button>
     </div>
-  </dialog>
+  </div>
 
-  <dialog id="new-ex-dialog">
-    <div class="dialog-body">
-      <h3>New exercise</h3>
+  <div id="new-ex-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="new-ex-title" hidden>
+    <div class="modal-backdrop" data-close-modal="new-ex-modal"></div>
+    <div class="modal-panel dialog-body">
+      <h3 id="new-ex-title">New exercise</h3>
       <label class="field">
         <span>Name</span>
         <input type="text" id="new-ex-name" maxlength="48" />
@@ -287,7 +292,7 @@
         <button type="button" class="btn primary" id="new-ex-save">Add</button>
       </div>
     </div>
-  </dialog>
+  </div>
 
   <script src="./app.js"></script>
 </body>

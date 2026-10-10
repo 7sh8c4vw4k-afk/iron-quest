@@ -681,6 +681,7 @@
     save();
     showView('start');
     renderStartView();
+    scrollToActiveSession();
   }
 
   function completeSession() {
@@ -766,8 +767,10 @@
   }
 
   function $(id) { return document.getElementById(id); }
+
   function toast(msg) {
     const el = $('toast');
+    if (!el) return;
     el.textContent = msg;
     el.hidden = false;
     clearTimeout(toast._t);
@@ -776,6 +779,78 @@
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function openModal(id) {
+    const el = $(id);
+    if (!el) return;
+    el.hidden = false;
+    el.classList.add('open');
+    document.body.classList.add('modal-open');
+  }
+
+  function closeModal(id) {
+    const el = $(id);
+    if (!el) return;
+    el.classList.remove('open');
+    el.hidden = true;
+    if (!document.querySelector('.modal.open')) {
+      document.body.classList.remove('modal-open');
+    }
+  }
+
+  function safeShowDialog(dlg) {
+    if (!dlg) return;
+    try {
+      if (typeof dlg.showModal === 'function') {
+        dlg.showModal();
+        return;
+      }
+    } catch (_) { /* iOS PWA / unsupported */ }
+    dlg.setAttribute('open', '');
+    dlg.classList.add('fallback-open');
+  }
+
+  function safeCloseDialog(dlg) {
+    if (!dlg) return;
+    try {
+      if (typeof dlg.close === 'function') {
+        dlg.close();
+        return;
+      }
+    } catch (_) {}
+    dlg.removeAttribute('open');
+    dlg.classList.remove('fallback-open');
+  }
+
+  function safeOn(id, event, handler) {
+    const el = typeof id === 'string' ? $(id) : id;
+    if (!el) {
+      console.warn('[Iron Quest] missing element for listener:', id);
+      return;
+    }
+    el.addEventListener(event, handler);
+  }
+
+  function bindSafe(label, fn) {
+    try {
+      fn();
+    } catch (err) {
+      console.error('[Iron Quest] bind failed:', label, err);
+    }
+  }
+
+  function scrollToActiveSession() {
+    requestAnimationFrame(() => {
+      const session = $('session-active');
+      const btn = $('btn-add-ex');
+      const target = (session && !session.classList.contains('hidden') && (btn || session)) || null;
+      if (target && typeof target.scrollIntoView === 'function') {
+        target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
   }
 
   function showView(name) {
@@ -798,7 +873,10 @@
     if (name !== 'settings') ui.previousView = name;
     if (name === 'profile') renderProfile();
     if (name === 'history') renderHistory();
-    if (name === 'start') renderStartView();
+    if (name === 'start') {
+      renderStartView();
+      if (state.draft) scrollToActiveSession();
+    }
     if (name === 'exercises') renderExercisesLib();
     if (name === 'measure') renderMeasure();
     if (name === 'settings') renderSettings();
@@ -809,7 +887,7 @@
       const dlg = $('confirm-dialog');
       $('confirm-title').textContent = title;
       $('confirm-msg').textContent = msg;
-      dlg.showModal();
+      safeShowDialog(dlg);
       dlg.addEventListener('close', function onClose() {
         dlg.removeEventListener('close', onClose);
         resolve(dlg.returnValue === 'ok');
@@ -829,6 +907,10 @@
     $('xp-today').textContent = state.xpToday;
     $('xp-cap').textContent = DAILY_XP_CAP;
     $('streak-weeks').textContent = computeStreak();
+    const startCta = $('btn-profile-start');
+    if (startCta) {
+      startCta.textContent = state.draft ? 'Resume Workout' : 'Start Workout';
+    }
 
     const grid = $('stats-grid');
     grid.classList.toggle('compact', !state.statsExpanded);
@@ -1196,13 +1278,16 @@
   }
 
   function openAddExercisePicker() {
-    if (!state.draft) return;
+    if (!state.draft) {
+      toast('Start a workout first');
+      return;
+    }
     ui.addExSearch = '';
     const input = $('add-ex-search');
     if (input) input.value = '';
     renderAddExPicker();
-    $('add-ex-dialog').showModal();
-    setTimeout(() => { if (input) input.focus(); }, 50);
+    openModal('add-ex-modal');
+    setTimeout(() => { if (input) input.focus(); }, 80);
   }
 
   function openTemplateDialog() {
@@ -1212,313 +1297,405 @@
     pick.innerHTML = allExercises().slice().sort((a, b) => a.name.localeCompare(b.name)).map((e) =>
       `<button type="button" class="chip" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`
     ).join('');
-    $('template-dialog').showModal();
+    safeShowDialog($('template-dialog'));
   }
 
   function openNewExerciseDialog() {
     const prim = $('new-ex-primary');
     const sec = $('new-ex-secondary');
+    if (!prim || !sec) return;
     prim.innerHTML = STAT_DEFS.map((s) => `<option value="${s.id}">${s.label}</option>`).join('');
     sec.innerHTML = '<option value="">— None —</option>' + STAT_DEFS.map((s) => `<option value="${s.id}">${s.label}</option>`).join('');
-    $('new-ex-name').value = '';
-    $('new-ex-dialog').showModal();
+    const nameEl = $('new-ex-name');
+    if (nameEl) nameEl.value = '';
+    openModal('new-ex-modal');
   }
 
   function bind() {
-    document.querySelectorAll('.tab').forEach((t) => {
-      t.addEventListener('click', () => showView(t.dataset.view));
-    });
-
-    $('btn-settings').addEventListener('click', () => showView('settings'));
-    $('btn-settings-back').addEventListener('click', () => showView(ui.previousView || 'profile'));
-    $('btn-toggle-stats').addEventListener('click', () => {
-      state.statsExpanded = !state.statsExpanded;
-      save();
-      renderProfile();
-    });
-
-    $('btn-add-widget').addEventListener('click', () => {
-      const w = state.widgets || defaultWidgets();
-      $('wig-wpw').checked = !!w.workoutsPerWeek;
-      $('wig-bw').checked = !!w.bodyWeight;
-      $('wig-cal').checked = !!w.caloricIntake;
-      $('widget-dialog').showModal();
-    });
-    $('widget-dialog').addEventListener('close', () => {
-      if ($('widget-dialog').returnValue !== 'ok') return;
-      state.widgets = {
-        workoutsPerWeek: $('wig-wpw').checked,
-        bodyWeight: $('wig-bw').checked,
-        caloricIntake: $('wig-cal').checked
-      };
-      save();
-      renderWidgets();
-      toast('Widgets updated');
-    });
-
-    $('btn-empty-workout').addEventListener('click', () => {
-      startWorkout({ type: 'Custom', name: 'Empty Workout', exercises: [] });
-    });
-
-    $('btn-new-template').addEventListener('click', openTemplateDialog);
-    $('template-cancel').addEventListener('click', () => $('template-dialog').close());
-    $('template-ex-pick').addEventListener('click', (e) => {
-      const chip = e.target.closest('.chip');
-      if (!chip) return;
-      const name = chip.dataset.name;
-      if (ui.templatePick.has(name)) {
-        ui.templatePick.delete(name);
-        chip.classList.remove('selected');
-      } else {
-        ui.templatePick.add(name);
-        chip.classList.add('selected');
-      }
-    });
-    $('template-save').addEventListener('click', () => {
-      const name = $('template-name').value.trim();
-      if (!name) { toast('Name required'); return; }
-      if (!ui.templatePick.size) { toast('Pick at least one exercise'); return; }
-      state.templates.push({
-        id: 'tmpl-' + Date.now(),
-        name,
-        exercises: [...ui.templatePick]
+    bindSafe('tabs', () => {
+      document.querySelectorAll('.tab').forEach((t) => {
+        t.addEventListener('click', () => {
+          const view = t.getAttribute('data-view') || t.dataset.view;
+          showView(view);
+          if (view === 'start' && state.draft) {
+            scrollToActiveSession();
+          }
+        });
       });
-      save();
-      $('template-dialog').close();
-      renderTemplates();
-      toast('Template saved');
     });
 
-    $('templates-grid').addEventListener('click', async (e) => {
-      const start = e.target.closest('.btn-start-tmpl');
-      if (start) {
-        const t = state.templates.find((x) => x.id === start.dataset.id);
-        if (!t) return;
-        startWorkout({ type: 'Custom', name: t.name, exercises: t.exercises.slice() });
-        return;
-      }
-      const del = e.target.closest('.btn-del-tmpl');
-      if (del) {
-        const ok = await confirmDialog('Delete template?', 'This cannot be undone.');
-        if (!ok) return;
-        state.templates = state.templates.filter((x) => x.id !== del.dataset.id);
+    bindSafe('settings', () => {
+      safeOn('btn-settings', 'click', () => showView('settings'));
+      safeOn('btn-settings-back', 'click', () => showView(ui.previousView || 'profile'));
+    });
+
+    bindSafe('toggle-stats', () => {
+      safeOn('btn-toggle-stats', 'click', () => {
+        state.statsExpanded = !state.statsExpanded;
         save();
+        renderProfile();
+      });
+    });
+
+    bindSafe('profile-start', () => {
+      safeOn('btn-profile-start', 'click', () => {
+        if (state.draft) {
+          showView('start');
+          renderStartView();
+          scrollToActiveSession();
+          toast('Resuming workout');
+          return;
+        }
+        startWorkout({ type: 'Custom', name: 'Empty Workout', exercises: [] });
+      });
+    });
+
+    bindSafe('widgets', () => {
+      safeOn('btn-add-widget', 'click', () => {
+        const w = state.widgets || defaultWidgets();
+        const wpw = $('wig-wpw');
+        const bw = $('wig-bw');
+        const cal = $('wig-cal');
+        if (wpw) wpw.checked = !!w.workoutsPerWeek;
+        if (bw) bw.checked = !!w.bodyWeight;
+        if (cal) cal.checked = !!w.caloricIntake;
+        safeShowDialog($('widget-dialog'));
+      });
+      safeOn('widget-dialog', 'close', () => {
+        if ($('widget-dialog').returnValue !== 'ok') return;
+        state.widgets = {
+          workoutsPerWeek: $('wig-wpw').checked,
+          bodyWeight: $('wig-bw').checked,
+          caloricIntake: $('wig-cal').checked
+        };
+        save();
+        renderWidgets();
+        toast('Widgets updated');
+      });
+    });
+
+    bindSafe('empty-workout', () => {
+      safeOn('btn-empty-workout', 'click', () => {
+        startWorkout({ type: 'Custom', name: 'Empty Workout', exercises: [] });
+      });
+    });
+
+    bindSafe('templates', () => {
+      safeOn('btn-new-template', 'click', openTemplateDialog);
+      safeOn('template-cancel', 'click', () => safeCloseDialog($('template-dialog')));
+      safeOn('template-ex-pick', 'click', (e) => {
+        const chip = e.target.closest('.chip');
+        if (!chip) return;
+        const name = chip.getAttribute('data-name') || chip.dataset.name;
+        if (ui.templatePick.has(name)) {
+          ui.templatePick.delete(name);
+          chip.classList.remove('selected');
+        } else {
+          ui.templatePick.add(name);
+          chip.classList.add('selected');
+        }
+      });
+      safeOn('template-save', 'click', () => {
+        const name = ($('template-name') && $('template-name').value.trim()) || '';
+        if (!name) { toast('Name required'); return; }
+        if (!ui.templatePick.size) { toast('Pick at least one exercise'); return; }
+        state.templates.push({
+          id: 'tmpl-' + Date.now(),
+          name,
+          exercises: [...ui.templatePick]
+        });
+        save();
+        safeCloseDialog($('template-dialog'));
         renderTemplates();
-        toast('Template deleted');
-      }
-    });
-
-    $('btn-workout-back').addEventListener('click', () => {
-      // Keep draft; leave Start for Profile — return via + to resume
-      if (state.draft) toast('Draft saved — tap + to resume');
-      showView('profile');
-    });
-
-    $('btn-add-ex').addEventListener('click', openAddExercisePicker);
-
-    $('add-ex-close').addEventListener('click', () => $('add-ex-dialog').close());
-    $('add-ex-search').addEventListener('input', () => {
-      ui.addExSearch = $('add-ex-search').value;
-      renderAddExPicker();
-    });
-    $('add-ex-search').addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      const list = filteredAddExList(ui.addExSearch);
-      if (list.length === 1) {
-        addExerciseToDraft(list[0].name);
-        $('add-ex-dialog').close();
-      } else if (ui.addExSearch.trim()) {
-        $('add-ex-custom').click();
-      }
-    });
-    $('add-ex-list').addEventListener('click', (e) => {
-      const row = e.target.closest('.add-ex-pick-row');
-      if (!row) return;
-      addExerciseToDraft(row.dataset.name);
-      $('add-ex-dialog').close();
-    });
-    $('add-ex-custom').addEventListener('click', () => {
-      const q = ui.addExSearch.trim();
-      if (q) {
-        addExerciseToDraft(q);
-        $('add-ex-dialog').close();
-        return;
-      }
-      ui.addExToDraftAfterCreate = !!state.draft;
-      $('add-ex-dialog').close();
-      openNewExerciseDialog();
-    });
-
-    $('exercise-list').addEventListener('click', (e) => {
-      const rem = e.target.closest('.btn-remove-ex');
-      if (rem) {
-        state.draft.exercises.splice(Number(rem.dataset.ei), 1);
-        save();
-        renderActiveExercises();
-        return;
-      }
-      const add = e.target.closest('.btn-add-set');
-      if (add) {
-        state.draft.exercises[Number(add.dataset.ei)].sets.push({ weight: '', reps: '', rpe: '', done: false });
-        save();
-        renderActiveExercises();
-        return;
-      }
-      const chk = e.target.closest('.set-check');
-      if (chk) {
-        const set = state.draft.exercises[Number(chk.dataset.ei)].sets[Number(chk.dataset.si)];
-        set.done = !set.done;
-        save();
-        renderActiveExercises();
-      }
-    });
-
-    $('exercise-list').addEventListener('input', (e) => {
-      const t = e.target;
-      if (t.matches('input[data-f]')) {
-        state.draft.exercises[Number(t.dataset.ei)].sets[Number(t.dataset.si)][t.dataset.f] =
-          t.value === '' ? '' : Number(t.value);
-        save();
-      }
-      if (t.matches('.ex-notes')) {
-        state.draft.exercises[Number(t.dataset.ei)].notes = t.value;
-        clearTimeout(bind._noteT);
-        bind._noteT = setTimeout(save, 300);
-      }
-    });
-
-    $('session-notes').addEventListener('input', () => {
-      if (!state.draft) return;
-      state.draft.notes = $('session-notes').value;
-      clearTimeout(bind._snT);
-      bind._snT = setTimeout(save, 300);
-    });
-
-    $('btn-complete-session').addEventListener('click', completeSession);
-    $('btn-cancel-session').addEventListener('click', async () => {
-      const ok = await confirmDialog('Discard session?', 'Unsaved sets will be lost.');
-      if (!ok) return;
-      state.draft = null;
-      save();
-      renderStartView();
-      toast('Session discarded');
-    });
-
-    $('btn-freeze').addEventListener('click', applyFreeze);
-
-    $('history-list').addEventListener('click', (e) => {
-      const item = e.target.closest('.hist-item');
-      if (!item) return;
-      const det = item.querySelector('.hist-detail');
-      if (det) det.classList.toggle('hidden');
-    });
-
-    $('lib-search').addEventListener('input', () => {
-      ui.libSearch = $('lib-search').value;
-      renderExercisesLib();
-    });
-    $('filter-body').addEventListener('click', (e) => {
-      const chip = e.target.closest('.chip');
-      if (!chip) return;
-      ui.filterBody = chip.dataset.body || '';
-      renderExercisesLib();
-    });
-    $('filter-cat').addEventListener('click', (e) => {
-      const chip = e.target.closest('.chip');
-      if (!chip) return;
-      ui.filterCat = chip.dataset.cat || '';
-      renderExercisesLib();
-    });
-
-    $('btn-new-exercise').addEventListener('click', openNewExerciseDialog);
-    $('new-ex-cancel').addEventListener('click', () => {
-      ui.addExToDraftAfterCreate = false;
-      $('new-ex-dialog').close();
-    });
-    $('new-ex-save').addEventListener('click', () => {
-      const name = $('new-ex-name').value.trim();
-      if (!name) { toast('Name required'); return; }
-      if (allExercises().some((e) => e.name.toLowerCase() === name.toLowerCase())) {
-        toast('Exercise already exists');
-        return;
-      }
-      const primary = $('new-ex-primary').value;
-      const secondary = $('new-ex-secondary').value;
-      const tags = [];
-      if (ACTIVITY_STATS.has(primary)) tags.push('activity', primary);
-      state.customExercises.push({
-        name,
-        primary: [primary],
-        secondary: secondary ? [secondary] : [],
-        tags
+        toast('Template saved');
       });
-      save();
-      $('new-ex-dialog').close();
-      renderExercisesLib();
-      if (ui.addExToDraftAfterCreate && state.draft) {
-        ui.addExToDraftAfterCreate = false;
+      safeOn('templates-grid', 'click', async (e) => {
+        const start = e.target.closest('.btn-start-tmpl');
+        if (start) {
+          const t = state.templates.find((x) => x.id === (start.getAttribute('data-id') || start.dataset.id));
+          if (!t) return;
+          startWorkout({ type: 'Custom', name: t.name, exercises: t.exercises.slice() });
+          return;
+        }
+        const del = e.target.closest('.btn-del-tmpl');
+        if (del) {
+          const ok = await confirmDialog('Delete template?', 'This cannot be undone.');
+          if (!ok) return;
+          const id = del.getAttribute('data-id') || del.dataset.id;
+          state.templates = state.templates.filter((x) => x.id !== id);
+          save();
+          renderTemplates();
+          toast('Template deleted');
+        }
+      });
+    });
+
+    bindSafe('workout-back', () => {
+      safeOn('btn-workout-back', 'click', () => {
+        if (state.draft) toast('Draft saved — tap + or Start Workout to resume');
+        showView('profile');
+      });
+    });
+
+    bindSafe('add-exercise', () => {
+      safeOn('btn-add-ex', 'click', openAddExercisePicker);
+      safeOn('add-ex-close', 'click', () => closeModal('add-ex-modal'));
+      const addModal = $('add-ex-modal');
+      if (addModal) {
+        addModal.addEventListener('click', (e) => {
+          if (e.target.closest('[data-close-modal="add-ex-modal"]')) {
+            closeModal('add-ex-modal');
+          }
+        });
+      }
+      safeOn('add-ex-search', 'input', () => {
+        ui.addExSearch = $('add-ex-search').value;
+        renderAddExPicker();
+      });
+      safeOn('add-ex-search', 'keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const list = filteredAddExList(ui.addExSearch);
+        if (list.length === 1) {
+          addExerciseToDraft(list[0].name);
+          closeModal('add-ex-modal');
+        } else if (ui.addExSearch.trim()) {
+          const custom = $('add-ex-custom');
+          if (custom) custom.click();
+        }
+      });
+      safeOn('add-ex-list', 'click', (e) => {
+        const row = e.target.closest('.add-ex-pick-row');
+        if (!row) return;
+        e.preventDefault();
+        const name = row.getAttribute('data-name') || row.dataset.name;
+        if (!name) return;
         addExerciseToDraft(name);
-      } else {
-        toast('Exercise added');
+        closeModal('add-ex-modal');
+      });
+      safeOn('add-ex-custom', 'click', () => {
+        const q = ui.addExSearch.trim();
+        if (q) {
+          addExerciseToDraft(q);
+          closeModal('add-ex-modal');
+          return;
+        }
+        ui.addExToDraftAfterCreate = !!state.draft;
+        closeModal('add-ex-modal');
+        openNewExerciseDialog();
+      });
+    });
+
+    bindSafe('exercise-list', () => {
+      safeOn('exercise-list', 'click', (e) => {
+        const rem = e.target.closest('.btn-remove-ex');
+        if (rem) {
+          state.draft.exercises.splice(Number(rem.getAttribute('data-ei') || rem.dataset.ei), 1);
+          save();
+          renderActiveExercises();
+          return;
+        }
+        const add = e.target.closest('.btn-add-set');
+        if (add) {
+          state.draft.exercises[Number(add.getAttribute('data-ei') || add.dataset.ei)].sets.push({ weight: '', reps: '', rpe: '', done: false });
+          save();
+          renderActiveExercises();
+          return;
+        }
+        const chk = e.target.closest('.set-check');
+        if (chk) {
+          const ei = Number(chk.getAttribute('data-ei') || chk.dataset.ei);
+          const si = Number(chk.getAttribute('data-si') || chk.dataset.si);
+          const set = state.draft.exercises[ei].sets[si];
+          set.done = !set.done;
+          save();
+          renderActiveExercises();
+        }
+      });
+      safeOn('exercise-list', 'input', (e) => {
+        const t = e.target;
+        if (t.matches('input[data-f]')) {
+          const ei = Number(t.getAttribute('data-ei') || t.dataset.ei);
+          const si = Number(t.getAttribute('data-si') || t.dataset.si);
+          const f = t.getAttribute('data-f') || t.dataset.f;
+          state.draft.exercises[ei].sets[si][f] = t.value === '' ? '' : Number(t.value);
+          save();
+        }
+        if (t.matches('.ex-notes')) {
+          const ei = Number(t.getAttribute('data-ei') || t.dataset.ei);
+          state.draft.exercises[ei].notes = t.value;
+          clearTimeout(bind._noteT);
+          bind._noteT = setTimeout(save, 300);
+        }
+      });
+    });
+
+    bindSafe('session-notes', () => {
+      safeOn('session-notes', 'input', () => {
+        if (!state.draft) return;
+        state.draft.notes = $('session-notes').value;
+        clearTimeout(bind._snT);
+        bind._snT = setTimeout(save, 300);
+      });
+    });
+
+    bindSafe('complete-cancel', () => {
+      safeOn('btn-complete-session', 'click', completeSession);
+      safeOn('btn-cancel-session', 'click', async () => {
+        const ok = await confirmDialog('Discard session?', 'Unsaved sets will be lost.');
+        if (!ok) return;
+        state.draft = null;
+        save();
+        renderStartView();
+        toast('Session discarded');
+      });
+    });
+
+    bindSafe('freeze', () => {
+      safeOn('btn-freeze', 'click', applyFreeze);
+    });
+
+    bindSafe('history', () => {
+      safeOn('history-list', 'click', (e) => {
+        const item = e.target.closest('.hist-item');
+        if (!item) return;
+        const det = item.querySelector('.hist-detail');
+        if (det) det.classList.toggle('hidden');
+      });
+    });
+
+    bindSafe('lib-filters', () => {
+      safeOn('lib-search', 'input', () => {
+        ui.libSearch = $('lib-search').value;
+        renderExercisesLib();
+      });
+      safeOn('filter-body', 'click', (e) => {
+        const chip = e.target.closest('.chip');
+        if (!chip) return;
+        ui.filterBody = chip.getAttribute('data-body') || chip.dataset.body || '';
+        renderExercisesLib();
+      });
+      safeOn('filter-cat', 'click', (e) => {
+        const chip = e.target.closest('.chip');
+        if (!chip) return;
+        ui.filterCat = chip.getAttribute('data-cat') || chip.dataset.cat || '';
+        renderExercisesLib();
+      });
+    });
+
+    bindSafe('new-exercise', () => {
+      safeOn('btn-new-exercise', 'click', openNewExerciseDialog);
+      safeOn('new-ex-cancel', 'click', () => {
+        ui.addExToDraftAfterCreate = false;
+        closeModal('new-ex-modal');
+      });
+      const newModal = $('new-ex-modal');
+      if (newModal) {
+        newModal.addEventListener('click', (e) => {
+          if (e.target.closest('[data-close-modal="new-ex-modal"]')) {
+            ui.addExToDraftAfterCreate = false;
+            closeModal('new-ex-modal');
+          }
+        });
       }
-    });
-
-    $('measure-list').addEventListener('click', (e) => {
-      const btn = e.target.closest('.btn-plus');
-      if (!btn) return;
-      ui.measureTarget = btn.dataset.id;
-      const part = MEASURE_PARTS.find((p) => p.id === ui.measureTarget);
-      $('measure-dlg-title').textContent = part ? part.label : 'Log measurement';
-      $('measure-value').value = '';
-      $('measure-dialog').showModal();
-      setTimeout(() => $('measure-value').focus(), 50);
-    });
-    $('measure-dialog').addEventListener('close', () => {
-      if ($('measure-dialog').returnValue !== 'ok' || !ui.measureTarget) return;
-      const val = Number($('measure-value').value);
-      if (!val || val <= 0) { toast('Enter a positive value'); return; }
-      if (!state.measurements[ui.measureTarget]) state.measurements[ui.measureTarget] = [];
-      state.measurements[ui.measureTarget].push({
-        date: localDateKey(new Date()),
-        value: Math.round(val * 10) / 10
+      safeOn('new-ex-save', 'click', () => {
+        const name = ($('new-ex-name') && $('new-ex-name').value.trim()) || '';
+        if (!name) { toast('Name required'); return; }
+        if (allExercises().some((e) => e.name.toLowerCase() === name.toLowerCase())) {
+          toast('Exercise already exists');
+          return;
+        }
+        const primary = $('new-ex-primary').value;
+        const secondary = $('new-ex-secondary').value;
+        const tags = [];
+        if (ACTIVITY_STATS.has(primary)) tags.push('activity', primary);
+        state.customExercises.push({
+          name,
+          primary: [primary],
+          secondary: secondary ? [secondary] : [],
+          tags
+        });
+        save();
+        closeModal('new-ex-modal');
+        renderExercisesLib();
+        if (ui.addExToDraftAfterCreate && state.draft) {
+          ui.addExToDraftAfterCreate = false;
+          addExerciseToDraft(name);
+        } else {
+          toast('Exercise added');
+        }
       });
-      save();
-      renderMeasure();
-      toast('Measurement saved');
-      ui.measureTarget = null;
     });
 
-    $('btn-log-weight').addEventListener('click', () => {
-      const val = Number($('weight-input').value);
-      if (!val || val <= 0) { toast('Enter weight in kg'); return; }
-      state.bodyWeightLog.push({
-        date: localDateKey(new Date()),
-        weight: Math.round(val * 10) / 10
+    bindSafe('measure', () => {
+      safeOn('measure-list', 'click', (e) => {
+        const btn = e.target.closest('.btn-plus');
+        if (!btn) return;
+        ui.measureTarget = btn.getAttribute('data-id') || btn.dataset.id;
+        const part = MEASURE_PARTS.find((p) => p.id === ui.measureTarget);
+        $('measure-dlg-title').textContent = part ? part.label : 'Log measurement';
+        $('measure-value').value = '';
+        safeShowDialog($('measure-dialog'));
+        setTimeout(() => { const v = $('measure-value'); if (v) v.focus(); }, 50);
       });
-      $('weight-input').value = '';
-      save();
-      renderMeasure();
-      renderWidgets();
-      toast('Weight logged');
+      safeOn('measure-dialog', 'close', () => {
+        if ($('measure-dialog').returnValue !== 'ok' || !ui.measureTarget) return;
+        const val = Number($('measure-value').value);
+        if (!val || val <= 0) { toast('Enter a positive value'); return; }
+        if (!state.measurements[ui.measureTarget]) state.measurements[ui.measureTarget] = [];
+        state.measurements[ui.measureTarget].push({
+          date: localDateKey(new Date()),
+          value: Math.round(val * 10) / 10
+        });
+        save();
+        renderMeasure();
+        toast('Measurement saved');
+        ui.measureTarget = null;
+      });
+      safeOn('btn-log-weight', 'click', () => {
+        const val = Number($('weight-input').value);
+        if (!val || val <= 0) { toast('Enter weight in kg'); return; }
+        state.bodyWeightLog.push({
+          date: localDateKey(new Date()),
+          weight: Math.round(val * 10) / 10
+        });
+        $('weight-input').value = '';
+        save();
+        renderMeasure();
+        renderWidgets();
+        toast('Weight logged');
+      });
     });
 
-    $('btn-save-name').addEventListener('click', () => {
-      const n = $('setting-name').value.trim() || 'Long';
-      state.displayName = n.slice(0, 24);
-      save();
-      toast('Name saved');
-      renderProfile();
+    bindSafe('settings-actions', () => {
+      safeOn('btn-save-name', 'click', () => {
+        const n = ($('setting-name') && $('setting-name').value.trim()) || 'Long';
+        state.displayName = n.slice(0, 24);
+        save();
+        toast('Name saved');
+        renderProfile();
+      });
+      safeOn('btn-reset', 'click', async () => {
+        const ok = await confirmDialog('Reset all data?', 'This wipes workouts, XP, stats, PRs, streak, templates, and measurements. Cannot undo.');
+        if (!ok) return;
+        state = defaultState();
+        save();
+        toast('Data reset');
+        showView('profile');
+        renderAll();
+      });
     });
 
-    $('btn-reset').addEventListener('click', async () => {
-      const ok = await confirmDialog('Reset all data?', 'This wipes workouts, XP, stats, PRs, streak, templates, and measurements. Cannot undo.');
-      if (!ok) return;
-      state = defaultState();
-      save();
-      toast('Data reset');
-      showView('profile');
-      renderAll();
+    bindSafe('escape-modals', () => {
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if ($('add-ex-modal') && $('add-ex-modal').classList.contains('open')) {
+          closeModal('add-ex-modal');
+        } else if ($('new-ex-modal') && $('new-ex-modal').classList.contains('open')) {
+          ui.addExToDraftAfterCreate = false;
+          closeModal('new-ex-modal');
+        }
+      });
     });
   }
 
