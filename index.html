@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#0a0a0a" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Iron Quest" />
@@ -16,113 +16,125 @@
 </head>
 <body>
   <div id="app">
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark" aria-hidden="true">⬡</span>
+    <main id="view-profile" class="view active">
+      <header class="page-header">
         <div>
-          <h1>Iron Quest</h1>
-          <p class="subtitle" id="greeting">Hey, Long</p>
+          <h1 id="profile-name">Long</h1>
+          <p class="muted small" id="profile-rank">Level 1 · Novice</p>
         </div>
-      </div>
-      <button type="button" class="icon-btn" id="btn-settings" aria-label="Settings" title="Settings">⚙</button>
-    </header>
+        <button type="button" class="icon-btn" id="btn-settings" aria-label="Settings">⚙</button>
+      </header>
 
-    <main id="view-home" class="view active">
-      <section class="card hero">
+      <section class="card hero compact-hero">
         <div class="level-row">
           <div class="level-badge" id="level-badge">1</div>
           <div class="level-meta">
-            <div class="level-label">Level <span id="level-num">1</span> · <span id="rank-name">Novice</span></div>
+            <div class="level-label">XP · Today <span id="xp-today">0</span>/<span id="xp-cap">150</span></div>
             <div class="xp-bar"><div class="xp-fill" id="xp-fill" style="width:0%"></div></div>
-            <div class="xp-text"><span id="xp-current">0</span> / <span id="xp-next">100</span> XP · Today <span id="xp-today">0</span>/<span id="xp-cap">150</span></div>
+            <div class="xp-text"><span id="xp-current">0</span> / <span id="xp-next">100</span> · 🔥 <span id="streak-weeks">0</span> wk</div>
           </div>
-        </div>
-        <div class="streak-row">
-          <div class="streak-pill">
-            <span class="streak-fire">🔥</span>
-            <div>
-              <strong id="streak-weeks">0</strong> week streak
-              <div class="muted small" id="streak-detail">No workouts yet</div>
-            </div>
-          </div>
-          <button type="button" class="btn ghost small" id="btn-freeze" hidden>❄ Freeze</button>
         </div>
       </section>
 
       <section class="card">
-        <h2>Stats</h2>
-        <div class="stats-grid" id="stats-grid"></div>
-      </section>
-
-      <section class="card">
-        <h2>Quests</h2>
-        <div id="quests-list" class="quests"></div>
-      </section>
-
-      <section class="card" id="last-workout-card">
-        <h2>Last workout</h2>
-        <div id="last-workout" class="muted">No sessions logged yet. Hit the iron.</div>
-      </section>
-
-      <button type="button" class="btn primary big cta" id="btn-log">Log workout</button>
-    </main>
-
-    <main id="view-workout" class="view">
-      <div class="view-header">
-        <button type="button" class="btn ghost" id="btn-workout-back">← Back</button>
-        <h2 id="workout-title">New session</h2>
-        <span></span>
-      </div>
-
-      <section class="card" id="session-pick">
-        <h3>Session type</h3>
-        <div class="chip-row" id="session-types"></div>
-        <label class="field">
-          <span>Custom name (optional)</span>
-          <input type="text" id="session-name" placeholder="e.g. Heavy Push" maxlength="40" />
-        </label>
-        <button type="button" class="btn primary" id="btn-start-session">Start session</button>
-      </section>
-
-      <section class="card hidden" id="session-active">
-        <div class="session-meta">
-          <span class="tag" id="active-type">Push</span>
-          <span class="muted small" id="active-time"></span>
+        <div class="section-head">
+          <h2>Body stats</h2>
+          <button type="button" class="btn ghost small" id="btn-toggle-stats">Expand</button>
         </div>
-
-        <div class="add-ex">
-          <label class="field">
-            <span>Add exercise</span>
-            <input type="text" id="ex-search" list="ex-library" placeholder="Search or type name…" autocomplete="off" />
-            <datalist id="ex-library"></datalist>
-          </label>
-          <button type="button" class="btn secondary" id="btn-add-ex">Add</button>
-        </div>
-
-        <div id="exercise-list" class="exercise-list"></div>
-
-        <label class="field">
-          <span>Session notes (optional)</span>
-          <textarea id="session-notes" rows="2" placeholder="How did it feel?"></textarea>
-        </label>
-
-        <div class="row-actions">
-          <button type="button" class="btn danger ghost" id="btn-cancel-session">Discard</button>
-          <button type="button" class="btn primary" id="btn-complete-session">Complete → XP</button>
-        </div>
+        <div class="stats-grid compact" id="stats-grid"></div>
       </section>
+
+      <div id="widgets-area"></div>
+      <button type="button" class="btn ghost big" id="btn-add-widget">+ Widget</button>
     </main>
 
     <main id="view-history" class="view">
-      <div class="view-header">
-        <h2>History</h2>
-      </div>
-      <section class="card">
+      <header class="page-header">
+        <h1>History</h1>
+      </header>
+      <section class="card flat">
         <div id="history-list" class="history-list muted">No workouts yet.</div>
       </section>
       <section class="card">
         <h2>Personal records</h2>
         <div id="pr-list" class="pr-list muted">PRs appear when you set a best set.</div>
+      </section>
+    </main>
+
+    <main id="view-start" class="view">
+      <header class="page-header" id="start-header">
+        <h1>Start Workout</h1>
+      </header>
+
+      <div id="start-hub">
+        <button type="button" class="btn primary big cta" id="btn-empty-workout">Start an Empty Workout</button>
+        <div class="section-head templates-head">
+          <h2>Templates</h2>
+          <button type="button" class="btn ghost small" id="btn-new-template">+ Template</button>
+        </div>
+        <div id="templates-grid" class="templates-grid"></div>
+      </div>
+
+      <div id="session-active" class="hidden">
+        <div class="view-header tight">
+          <button type="button" class="btn ghost" id="btn-workout-back">← Back</button>
+          <h2 id="workout-title">Workout</h2>
+          <span></span>
+        </div>
+        <section class="card">
+          <div class="session-meta">
+            <span class="tag" id="active-type">Custom</span>
+            <span class="muted small" id="active-time">In progress</span>
+          </div>
+          <div class="add-ex">
+            <label class="field">
+              <span>Add exercise</span>
+              <input type="text" id="ex-search" list="ex-library" placeholder="Search or type name…" autocomplete="off" />
+              <datalist id="ex-library"></datalist>
+            </label>
+            <button type="button" class="btn secondary" id="btn-add-ex">Add</button>
+          </div>
+          <div id="exercise-list" class="exercise-list"></div>
+          <label class="field">
+            <span>Session notes (optional)</span>
+            <textarea id="session-notes" rows="2" placeholder="How did it feel?"></textarea>
+          </label>
+          <div class="row-actions">
+            <button type="button" class="btn danger ghost" id="btn-cancel-session">Discard</button>
+            <button type="button" class="btn primary" id="btn-complete-session">Complete → XP</button>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <main id="view-exercises" class="view">
+      <header class="page-header">
+        <h1>Exercises</h1>
+        <button type="button" class="btn secondary small" id="btn-new-exercise">New</button>
+      </header>
+      <div class="search-bar">
+        <input type="search" id="lib-search" placeholder="Search exercises…" autocomplete="off" />
+      </div>
+      <div class="chip-row filters" id="filter-body"></div>
+      <div class="chip-row filters" id="filter-cat"></div>
+      <div id="exercise-lib-list" class="ex-lib-list"></div>
+    </main>
+
+    <main id="view-measure" class="view">
+      <header class="page-header">
+        <h1>Measure</h1>
+      </header>
+      <p class="muted small measure-hint">Body circumference (cm). Tap + to log.</p>
+      <section class="card flat">
+        <div id="measure-list" class="measure-list"></div>
+      </section>
+      <section class="card">
+        <h2>Body weight</h2>
+        <div class="weight-log-row">
+          <input type="number" id="weight-input" inputmode="decimal" step="0.1" min="0" placeholder="kg" />
+          <button type="button" class="btn primary" id="btn-log-weight">Log kg</button>
+        </div>
+        <div id="weight-history" class="muted small" style="margin-top:8px"></div>
       </section>
     </main>
 
@@ -140,25 +152,54 @@
         <button type="button" class="btn secondary" id="btn-save-name">Save name</button>
       </section>
       <section class="card">
+        <div class="streak-row settings-streak">
+          <div class="streak-pill">
+            <span class="streak-fire">🔥</span>
+            <div>
+              <strong id="settings-streak">0</strong> week streak
+              <div class="muted small" id="streak-detail">No workouts yet</div>
+            </div>
+          </div>
+          <button type="button" class="btn ghost small" id="btn-freeze" hidden>❄ Freeze</button>
+        </div>
+      </section>
+      <section class="card">
+        <h3>Quests</h3>
+        <div id="quests-list" class="quests"></div>
+      </section>
+      <section class="card">
         <h3>About</h3>
         <p class="muted small">Iron Quest stores everything locally in <code>iron-quest-v1</code>. Install from Share → Add to Home Screen on iPhone.</p>
-        <p class="muted small">Version 1.1 · Body-part stats · Weekly streak = consecutive ISO weeks with ≥1 completed workout.</p>
+        <p class="muted small">Version 2.0 · Hevy-style tabs · Body-part RPG · SW iron-quest-v6</p>
       </section>
       <section class="card danger-zone">
         <h3>Reset</h3>
-        <p class="muted small">Wipes all workouts, XP, stats, PRs, and streak. Cannot undo.</p>
+        <p class="muted small">Wipes all workouts, XP, stats, PRs, streak, templates, and measurements. Cannot undo.</p>
         <button type="button" class="btn danger" id="btn-reset">Reset all data…</button>
       </section>
     </main>
 
     <nav class="tabbar" aria-label="Main">
-      <button type="button" class="tab active" data-view="home">Home</button>
-      <button type="button" class="tab" data-view="workout">Log</button>
-      <button type="button" class="tab" data-view="history">History</button>
+      <button type="button" class="tab active" data-view="profile">
+        <span class="tab-icon">👤</span><span class="tab-label">Profile</span>
+      </button>
+      <button type="button" class="tab" data-view="history">
+        <span class="tab-icon">📅</span><span class="tab-label">History</span>
+      </button>
+      <button type="button" class="tab tab-center" data-view="start">
+        <span class="tab-plus">+</span>
+      </button>
+      <button type="button" class="tab" data-view="exercises">
+        <span class="tab-icon">🏋️</span><span class="tab-label">Exercises</span>
+      </button>
+      <button type="button" class="tab" data-view="measure">
+        <span class="tab-icon">📏</span><span class="tab-label">Measure</span>
+      </button>
     </nav>
   </div>
 
   <div id="toast" class="toast" hidden></div>
+
   <dialog id="confirm-dialog">
     <form method="dialog" class="dialog-body">
       <h3 id="confirm-title">Confirm</h3>
@@ -168,6 +209,74 @@
         <button type="submit" value="ok" class="btn danger" id="confirm-ok">Confirm</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="widget-dialog">
+    <form method="dialog" class="dialog-body">
+      <h3>Widgets</h3>
+      <p class="muted small">Toggle dashboard widgets</p>
+      <label class="check-row"><input type="checkbox" id="wig-wpw" /> Workouts per week</label>
+      <label class="check-row"><input type="checkbox" id="wig-bw" /> Body weight</label>
+      <label class="check-row"><input type="checkbox" id="wig-cal" /> Caloric intake</label>
+      <div class="row-actions">
+        <button type="submit" value="cancel" class="btn ghost">Cancel</button>
+        <button type="submit" value="ok" class="btn primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="measure-dialog">
+    <form method="dialog" class="dialog-body">
+      <h3 id="measure-dlg-title">Log measurement</h3>
+      <label class="field">
+        <span>Value (cm)</span>
+        <input type="number" id="measure-value" inputmode="decimal" step="0.1" min="0" required />
+      </label>
+      <div class="row-actions">
+        <button type="submit" value="cancel" class="btn ghost">Cancel</button>
+        <button type="submit" value="ok" class="btn primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="template-dialog">
+    <div class="dialog-body">
+      <h3 id="template-dlg-title">New template</h3>
+      <label class="field">
+        <span>Name</span>
+        <input type="text" id="template-name" maxlength="40" placeholder="e.g. Push A" />
+      </label>
+      <label class="field"><span>Exercises (tap to toggle)</span></label>
+      <div id="template-ex-pick" class="template-pick"></div>
+      <div class="row-actions">
+        <button type="button" class="btn ghost" id="template-cancel">Cancel</button>
+        <button type="button" class="btn primary" id="template-save">Save</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="new-ex-dialog">
+    <div class="dialog-body">
+      <h3>New exercise</h3>
+      <label class="field">
+        <span>Name</span>
+        <input type="text" id="new-ex-name" maxlength="48" />
+      </label>
+      <label class="field">
+        <span>Primary body part</span>
+        <select id="new-ex-primary"></select>
+      </label>
+      <label class="field">
+        <span>Secondary (optional)</span>
+        <select id="new-ex-secondary">
+          <option value="">— None —</option>
+        </select>
+      </label>
+      <div class="row-actions">
+        <button type="button" class="btn ghost" id="new-ex-cancel">Cancel</button>
+        <button type="button" class="btn primary" id="new-ex-save">Add</button>
+      </div>
+    </div>
   </dialog>
 
   <script src="./app.js"></script>

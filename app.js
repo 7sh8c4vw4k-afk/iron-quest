@@ -38,7 +38,33 @@
     [15, 'Veteran'], [20, 'Champion'], [30, 'Titan'], [50, 'Legend']
   ];
 
-  // primary / secondary = body-part or activity ids; tags kept for UI badges
+  const MEASURE_PARTS = [
+    { id: 'neck', label: 'Neck' },
+    { id: 'shoulders', label: 'Shoulders' },
+    { id: 'chest', label: 'Chest' },
+    { id: 'leftBicep', label: 'Left Bicep' },
+    { id: 'rightBicep', label: 'Right Bicep' },
+    { id: 'leftForearm', label: 'Left Forearm' },
+    { id: 'rightForearm', label: 'Right Forearm' },
+    { id: 'upperAbs', label: 'Upper Abs' },
+    { id: 'waist', label: 'Waist' },
+    { id: 'lowerAbs', label: 'Lower Abs' },
+    { id: 'hips', label: 'Hips' },
+    { id: 'leftThigh', label: 'Left Thigh' },
+    { id: 'rightThigh', label: 'Right Thigh' },
+    { id: 'leftCalf', label: 'Left Calf' },
+    { id: 'rightCalf', label: 'Right Calf' }
+  ];
+
+  const CATEGORIES = [
+    { id: '', label: 'Any Category' },
+    { id: 'push', label: 'Push' },
+    { id: 'pull', label: 'Pull' },
+    { id: 'legs', label: 'Legs' },
+    { id: 'core', label: 'Core' },
+    { id: 'activity', label: 'Activity' }
+  ];
+
   const EXERCISE_LIBRARY = [
     { name: "Archer Pull-up", primary: ["lat"], secondary: ["bicep", "forearm"], tags: ["compound", "pull"] },
     { name: "Back Extension", primary: ["glute"], secondary: ["hamstring", "core"], tags: ["legs", "core"] },
@@ -132,6 +158,35 @@
     { name: "Zercher Squat", primary: ["quad"], secondary: ["core", "glute"], tags: ["compound", "legs"] },
   ];
 
+
+  const DEFAULT_TEMPLATES = [
+    {
+      id: 'tmpl-back',
+      name: 'Back Day',
+      exercises: ['Pull-Up', 'Barbell Row', 'Lat Pulldown', 'Face Pull', 'Bicep Curl']
+    },
+    {
+      id: 'tmpl-chest',
+      name: 'Chest Day',
+      exercises: ['Bench Press', 'Incline Bench Press', 'Chest Fly', 'Dip', 'Tricep Pushdown']
+    },
+    {
+      id: 'tmpl-leg',
+      name: 'Leg Day',
+      exercises: ['Squat', 'Romanian Deadlift', 'Leg Press', 'Leg Curl', 'Calf Raise']
+    },
+    {
+      id: 'tmpl-shoulder',
+      name: 'Shoulder Day',
+      exercises: ['Overhead Press', 'Lateral Raise', 'Rear Delt Row', 'Face Pull', 'Shrug']
+    },
+    {
+      id: 'tmpl-grip',
+      name: 'Grip Test',
+      exercises: ['Dead Hang', 'Farmer Carry', 'Finger Hold', 'Towel Homers', 'Reverse Barbell Curl']
+    }
+  ];
+
   const COMPOUND_PATTERNS = [
     /squat/i, /bench/i, /deadlift/i, /\bohp\b/i, /overhead\s*press/i,
     /military\s*press/i, /\brow\b/i, /pull[\s-]?up/i, /chin[\s-]?up/i,
@@ -160,16 +215,25 @@
     { re: /cardio|run|bike|erg|burpee|hiit|jog|swim/i, primary: ['cardio'], secondary: [] }
   ];
 
-  // —— state ——
   function defaultStats() {
     const stats = {};
     for (const id of STAT_NAMES) stats[id] = 1;
     return stats;
   }
 
+  function defaultMeasurements() {
+    const m = {};
+    for (const p of MEASURE_PARTS) m[p.id] = [];
+    return m;
+  }
+
+  function defaultWidgets() {
+    return { workoutsPerWeek: true, bodyWeight: true, caloricIntake: false };
+  }
+
   function defaultState() {
     return {
-      version: 2,
+      version: 3,
       displayName: 'Long',
       level: 1,
       xp: 0,
@@ -181,7 +245,13 @@
       streakFreezeMonth: null,
       freezeAvailable: true,
       draft: null,
-      questsClaimed: { daily: null, weekly: null }
+      questsClaimed: { daily: null, weekly: null },
+      widgets: defaultWidgets(),
+      bodyWeightLog: [],
+      measurements: defaultMeasurements(),
+      templates: DEFAULT_TEMPLATES.map((t) => ({ ...t, exercises: t.exercises.slice() })),
+      customExercises: [],
+      statsExpanded: false
     };
   }
 
@@ -200,7 +270,35 @@
     return out;
   }
 
+  function normalizeMeasurements(raw) {
+    const out = defaultMeasurements();
+    if (!raw || typeof raw !== 'object') return out;
+    for (const p of MEASURE_PARTS) {
+      if (Array.isArray(raw[p.id])) out[p.id] = raw[p.id];
+    }
+    return out;
+  }
+
+  function normalizeTemplates(raw) {
+    if (!Array.isArray(raw) || !raw.length) {
+      return DEFAULT_TEMPLATES.map((t) => ({ ...t, exercises: t.exercises.slice() }));
+    }
+    return raw.map((t) => ({
+      id: t.id || ('tmpl-' + Date.now() + Math.random().toString(36).slice(2, 6)),
+      name: t.name || 'Template',
+      exercises: Array.isArray(t.exercises) ? t.exercises.slice() : []
+    }));
+  }
+
   let state = load();
+  let ui = {
+    libSearch: '',
+    filterBody: '',
+    filterCat: '',
+    measureTarget: null,
+    templatePick: new Set(),
+    previousView: 'profile'
+  };
 
   function load() {
     try {
@@ -211,11 +309,17 @@
       return {
         ...base,
         ...parsed,
-        version: 2,
+        version: 3,
         stats: normalizeStats(parsed.stats),
         questsClaimed: { ...base.questsClaimed, ...(parsed.questsClaimed || {}) },
         prs: parsed.prs && typeof parsed.prs === 'object' ? parsed.prs : {},
-        workouts: Array.isArray(parsed.workouts) ? parsed.workouts : []
+        workouts: Array.isArray(parsed.workouts) ? parsed.workouts : [],
+        widgets: { ...defaultWidgets(), ...(parsed.widgets || {}) },
+        bodyWeightLog: Array.isArray(parsed.bodyWeightLog) ? parsed.bodyWeightLog : [],
+        measurements: normalizeMeasurements(parsed.measurements),
+        templates: normalizeTemplates(parsed.templates),
+        customExercises: Array.isArray(parsed.customExercises) ? parsed.customExercises : [],
+        statsExpanded: !!parsed.statsExpanded
       };
     } catch {
       return defaultState();
@@ -307,11 +411,15 @@
     return weight * (1 + reps / 30);
   }
 
+  function allExercises() {
+    return EXERCISE_LIBRARY.concat(state.customExercises || []);
+  }
+
   function lookupExercise(name) {
-    const lib = EXERCISE_LIBRARY.find((e) => e.name.toLowerCase() === String(name || '').toLowerCase());
+    const lib = allExercises().find((e) => e.name.toLowerCase() === String(name || '').toLowerCase());
     if (lib) {
       return {
-        primary: lib.primary.slice(),
+        primary: (lib.primary || []).slice(),
         secondary: (lib.secondary || []).slice(),
         tags: lib.tags || []
       };
@@ -342,9 +450,7 @@
     const now = new Date();
     let cur = isoWeekKey(now);
     let streak = 0;
-    if (!weeks.has(cur)) {
-      cur = prevIsoWeek(cur);
-    }
+    if (!weeks.has(cur)) cur = prevIsoWeek(cur);
     while (weeks.has(cur)) {
       streak += 1;
       cur = prevIsoWeek(cur);
@@ -354,8 +460,7 @@
   }
 
   function canUseFreeze() {
-    const mk = monthKey(new Date());
-    return state.streakFreezeMonth !== mk;
+    return state.streakFreezeMonth !== monthKey(new Date());
   }
 
   function applyFreeze() {
@@ -392,7 +497,8 @@
     state.streakFreezeMonth = monthKey(new Date());
     save();
     toast('❄ Streak freeze applied for last week');
-    renderHome();
+    renderSettings();
+    renderProfile();
   }
 
   function workoutsOnDate(dateKey) {
@@ -485,6 +591,17 @@
             };
             prHits.push(ex.name);
           }
+        } else if (r > 0 && w === 0) {
+          const prev = state.prs[ex.name];
+          if (!prev || (prev.weight === 0 && r > (prev.reps || 0))) {
+            state.prs[ex.name] = {
+              weight: 0,
+              reps: r,
+              e1rm: r,
+              date: new Date().toISOString()
+            };
+            prHits.push(ex.name);
+          }
         }
       }
 
@@ -535,6 +652,35 @@
     return { xpRaw, statsDelta: compact, completedSets, volume, prHits };
   }
 
+  function makeEmptySets() {
+    return [
+      { weight: '', reps: '', rpe: '', done: false },
+      { weight: '', reps: '', rpe: '', done: false },
+      { weight: '', reps: '', rpe: '', done: false }
+    ];
+  }
+
+  function startWorkout(opts) {
+    const type = opts.type || 'Custom';
+    const name = opts.name || type;
+    const exerciseNames = opts.exercises || [];
+    state.draft = {
+      type,
+      name,
+      notes: '',
+      startedAt: new Date().toISOString(),
+      exercises: exerciseNames.map((n) => ({
+        name: n,
+        notes: '',
+        rpe: '',
+        sets: makeEmptySets()
+      }))
+    };
+    save();
+    showView('start');
+    renderStartView();
+  }
+
   function completeSession() {
     if (!state.draft || !state.draft.exercises.length) {
       toast('Add at least one exercise');
@@ -565,11 +711,9 @@
     };
 
     state.workouts.unshift(workout);
-
     const gained = addXp(result.xpRaw);
     workout.xpAwarded = gained;
     const questBonus = claimQuestsIfNeeded();
-
     state.draft = null;
     save();
 
@@ -583,9 +727,40 @@
     if (topParts.length) msg += ` · ${topParts.join('/')}`;
     if (gained === 0 && result.xpRaw > 0) msg = 'Daily XP cap reached — session saved';
     toast(msg);
-
-    showView('home');
+    showView('profile');
     renderAll();
+  }
+
+  function lastPerformance(exName) {
+    const pr = state.prs[exName];
+    if (pr) {
+      if (pr.weight > 0) return { text: `${pr.weight}×${pr.reps}`, sub: 'best' };
+      return { text: `${pr.reps} reps`, sub: 'best' };
+    }
+    for (const w of state.workouts) {
+      if (w.isFreeze) continue;
+      for (const ex of (w.exercises || [])) {
+        if (ex.name.toLowerCase() !== exName.toLowerCase()) continue;
+        const done = (ex.sets || []).filter((s) => s.done);
+        if (!done.length) continue;
+        const last = done[done.length - 1];
+        const wt = Number(last.weight) || 0;
+        const rp = Number(last.reps) || 0;
+        if (wt > 0) return { text: `${wt}×${rp}`, sub: 'last' };
+        if (rp > 0) return { text: `${rp} reps`, sub: 'last' };
+      }
+    }
+    return null;
+  }
+
+  function categoryOf(ex) {
+    const tags = ex.tags || [];
+    if (tags.includes('activity') || (ex.primary || []).some((p) => ACTIVITY_STATS.has(p))) return 'activity';
+    if (tags.includes('push')) return 'push';
+    if (tags.includes('pull')) return 'pull';
+    if (tags.includes('legs')) return 'legs';
+    if (tags.includes('core') || (ex.primary || []).includes('core')) return 'core';
+    return '';
   }
 
   function $(id) { return document.getElementById(id); }
@@ -597,19 +772,34 @@
     toast._t = setTimeout(() => { el.hidden = true; }, 2800);
   }
 
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
   function showView(name) {
     document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
-    const map = { home: 'view-home', workout: 'view-workout', history: 'view-history', settings: 'view-settings' };
-    $(map[name]).classList.add('active');
+    const map = {
+      profile: 'view-profile',
+      history: 'view-history',
+      start: 'view-start',
+      exercises: 'view-exercises',
+      measure: 'view-measure',
+      settings: 'view-settings'
+    };
+    const el = $(map[name]);
+    if (!el) return;
+    el.classList.add('active');
     document.querySelectorAll('.tab').forEach((t) => {
-      t.classList.toggle('active', t.dataset.view === name || (name === 'settings' && t.dataset.view === 'home'));
+      const tabView = t.dataset.view;
+      t.classList.toggle('active', tabView === name || (name === 'settings' && tabView === 'profile'));
     });
-    if (name === 'workout') renderWorkoutView();
+    if (name !== 'settings') ui.previousView = name;
+    if (name === 'profile') renderProfile();
     if (name === 'history') renderHistory();
-    if (name === 'home') renderHome();
-    if (name === 'settings') {
-      $('setting-name').value = state.displayName;
-    }
+    if (name === 'start') renderStartView();
+    if (name === 'exercises') renderExercisesLib();
+    if (name === 'measure') renderMeasure();
+    if (name === 'settings') renderSettings();
   }
 
   function confirmDialog(title, msg) {
@@ -625,33 +815,23 @@
     });
   }
 
-  function renderHome() {
+  function renderProfile() {
     ensureDailyXpReset();
-    $('greeting').textContent = `Hey, ${state.displayName}`;
+    $('profile-name').textContent = state.displayName;
+    $('profile-rank').textContent = `Level ${state.level} · ${rankForLevel(state.level)}`;
     $('level-badge').textContent = state.level;
-    $('level-num').textContent = state.level;
-    $('rank-name').textContent = rankForLevel(state.level);
     const need = xpForLevel(state.level);
     $('xp-current').textContent = state.xp;
     $('xp-next').textContent = need;
     $('xp-fill').style.width = `${Math.min(100, (state.xp / need) * 100)}%`;
     $('xp-today').textContent = state.xpToday;
     $('xp-cap').textContent = DAILY_XP_CAP;
-
-    const streak = computeStreak();
-    $('streak-weeks').textContent = streak;
-    const weeks = weeksWithWorkouts();
-    const thisWeek = isoWeekKey(new Date());
-    const trained = weeks.has(thisWeek);
-    $('streak-detail').textContent = trained
-      ? `Trained this week · ${workoutsInIsoWeek(thisWeek)} session(s)`
-      : 'Train this week to keep the streak';
-
-    const freezeBtn = $('btn-freeze');
-    freezeBtn.hidden = !canUseFreeze();
-    freezeBtn.title = canUseFreeze() ? 'Use 1 streak freeze this month' : 'Freeze used this month';
+    $('streak-weeks').textContent = computeStreak();
 
     const grid = $('stats-grid');
+    grid.classList.toggle('compact', !state.statsExpanded);
+    grid.classList.toggle('expanded', state.statsExpanded);
+    $('btn-toggle-stats').textContent = state.statsExpanded ? 'Collapse' : 'Expand';
     grid.innerHTML = STAT_NAMES.map((k) => {
       const v = state.stats[k] ?? 1;
       const pct = Math.min(100, (v / 50) * 100);
@@ -663,43 +843,151 @@
       </div>`;
     }).join('');
 
-    const today = localDateKey(new Date());
-    const week = isoWeekKey(new Date());
-    const dailyDone = workoutsOnDate(today) >= 1;
-    const weeklyCount = workoutsInIsoWeek(week);
-    const weeklyDone = weeklyCount >= 3;
-    $('quests-list').innerHTML = `
-      <div class="quest ${dailyDone ? 'done' : ''}">
-        <div class="quest-icon">${dailyDone ? '✅' : '⚔️'}</div>
-        <div class="quest-body">
-          <strong>Daily: Complete a workout</strong>
-          <div class="muted">${dailyDone ? 'Claimed +25 XP' : 'Log any session today · +25 XP'}</div>
-          <div class="quest-progress"><i style="width:${dailyDone ? 100 : 0}%"></i></div>
-        </div>
-      </div>
-      <div class="quest ${weeklyDone ? 'done' : ''}">
-        <div class="quest-icon">${weeklyDone ? '🏆' : '🐉'}</div>
-        <div class="quest-body">
-          <strong>Weekly boss: Hit 3 sessions</strong>
-          <div class="muted">${weeklyCount}/3 this week · +60 XP</div>
-          <div class="quest-progress"><i style="width:${Math.min(100, (weeklyCount / 3) * 100)}%"></i></div>
-        </div>
-      </div>`;
+    renderWidgets();
+  }
 
-    const last = state.workouts.find((w) => !w.isFreeze);
-    const lw = $('last-workout');
-    if (!last) {
-      lw.innerHTML = '<span class="muted">No sessions logged yet. Hit the iron.</span>';
+  function workoutsPerWeekData() {
+    const now = new Date();
+    const bars = [];
+    for (let i = 7; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i * 7);
+      const key = isoWeekKey(d);
+      const count = workoutsInIsoWeek(key);
+      const label = 'W' + key.split('-W')[1];
+      bars.push({ label: i === 0 ? 'Now' : label, count });
+    }
+    return bars;
+  }
+
+  function renderWidgets() {
+    const area = $('widgets-area');
+    const w = state.widgets || defaultWidgets();
+    let html = '';
+
+    if (w.workoutsPerWeek) {
+      const bars = workoutsPerWeekData();
+      const max = Math.max(1, ...bars.map((b) => b.count));
+      html += `<div class="widget"><h3>Workouts / week</h3><div class="bar-chart">`;
+      for (const b of bars) {
+        const h = Math.max(2, Math.round((b.count / max) * 70));
+        html += `<div class="bar-col"><div class="bar-fill" style="height:${b.count ? h : 2}px"></div><div class="bar-label">${b.label}</div></div>`;
+      }
+      html += `</div></div>`;
+    }
+
+    if (w.bodyWeight) {
+      const log = (state.bodyWeightLog || []).slice(-12);
+      html += `<div class="widget"><h3>Body weight</h3>`;
+      if (log.length < 2) {
+        html += `<div class="placeholder-widget">${log.length === 1 ? `Latest: ${log[0].weight} kg` : 'No recent data'} — log on Measure</div>`;
+      } else {
+        const vals = log.map((e) => e.weight);
+        const min = Math.min(...vals);
+        const max = Math.max(...vals);
+        const span = Math.max(0.5, max - min);
+        const pts = log.map((e, i) => {
+          const x = (i / (log.length - 1)) * 280 + 10;
+          const y = 70 - ((e.weight - min) / span) * 55;
+          return `${x},${y}`;
+        }).join(' ');
+        const circles = log.map((e, i) => {
+          const x = (i / (log.length - 1)) * 280 + 10;
+          const y = 70 - ((e.weight - min) / span) * 55;
+          return `<circle cx="${x}" cy="${y}" r="3"/>`;
+        }).join('');
+        html += `<svg class="line-chart" viewBox="0 0 300 80" preserveAspectRatio="none"><polyline points="${pts}"/>${circles}</svg>`;
+        html += `<div class="muted small" style="margin-top:6px">${log[log.length - 1].weight} kg · ${log[log.length - 1].date}</div>`;
+      }
+      html += `</div>`;
+    }
+
+    if (w.caloricIntake) {
+      html += `<div class="widget"><h3>Caloric intake</h3><div class="placeholder-widget">No recent data</div></div>`;
+    }
+
+    area.innerHTML = html;
+  }
+
+  function renderHistory() {
+    const real = state.workouts.filter((w) => !w.isFreeze);
+    const hl = $('history-list');
+    if (!real.length) {
+      hl.innerHTML = '<span class="muted">No workouts yet.</span>';
     } else {
-      const when = new Date(last.completedAt);
-      lw.innerHTML = `<strong>${escapeHtml(last.name)}</strong>
-        <div class="muted small">${when.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-        · ${last.completedSets || 0} sets · +${last.xpAwarded || 0} XP</div>`;
+      hl.innerHTML = real.map((w) => {
+        const when = new Date(w.completedAt);
+        const exNames = (w.exercises || []).map((e) => e.name).slice(0, 4).join(', ');
+        const more = (w.exercises || []).length > 4 ? '…' : '';
+        const detail = (w.exercises || []).map((e) => {
+          const done = e.sets.filter((s) => s.done);
+          return `${e.name}: ${done.map((s) => `${s.weight || 0}×${s.reps || 0}`).join(', ') || '—'}`;
+        }).join('\n');
+        return `<div class="hist-item" data-id="${w.id}">
+          <div class="left">
+            <strong>${escapeHtml(w.name)}</strong>
+            <div class="muted small">${when.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${escapeHtml(w.type)}</div>
+            <div class="muted small">${escapeHtml(exNames)}${more}</div>
+            <div class="hist-detail hidden" data-detail="${w.id}">${escapeHtml(detail)}${w.notes ? '\n\n' + escapeHtml(w.notes) : ''}</div>
+          </div>
+          <div class="muted small">+${w.xpAwarded || 0} XP</div>
+        </div>`;
+      }).join('');
+    }
+
+    const prs = Object.entries(state.prs).sort((a, b) => (b[1].e1rm || 0) - (a[1].e1rm || 0));
+    const pl = $('pr-list');
+    if (!prs.length) {
+      pl.innerHTML = '<span class="muted">PRs appear when you set a best set.</span>';
+    } else {
+      pl.innerHTML = prs.map(([name, p]) => `
+        <div class="pr-item">
+          <div><strong>${escapeHtml(name)}</strong>
+            <div class="muted small">${p.weight > 0 ? 'est. 1RM ' + p.e1rm : 'reps'} · ${new Date(p.date).toLocaleDateString()}</div>
+          </div>
+          <div><strong>${p.weight > 0 ? p.weight + ' × ' + p.reps : p.reps + ' reps'}</strong></div>
+        </div>`).join('');
     }
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function renderStartView() {
+    const hub = $('start-hub');
+    const active = $('session-active');
+    const header = $('start-header');
+    if (state.draft) {
+      hub.classList.add('hidden');
+      active.classList.remove('hidden');
+      if (header) header.classList.add('hidden');
+      $('workout-title').textContent = state.draft.name || state.draft.type;
+      $('active-type').textContent = state.draft.type;
+      $('active-time').textContent = 'In progress';
+      $('session-notes').value = state.draft.notes || '';
+      renderActiveExercises();
+    } else {
+      hub.classList.remove('hidden');
+      active.classList.add('hidden');
+      if (header) header.classList.remove('hidden');
+      renderTemplates();
+    }
+    const dl = $('ex-library');
+    dl.innerHTML = allExercises().map((e) => `<option value="${escapeHtml(e.name)}"></option>`).join('');
+  }
+
+  function renderTemplates() {
+    const grid = $('templates-grid');
+    grid.innerHTML = (state.templates || []).map((t) => {
+      const preview = (t.exercises || []).slice(0, 3).join(', ');
+      const more = (t.exercises || []).length > 3 ? '…' : '';
+      return `<div class="template-card" data-id="${escapeHtml(t.id)}">
+        <strong>${escapeHtml(t.name)}</strong>
+        <div class="muted">${escapeHtml(preview)}${more || (!preview ? 'No exercises' : '')}</div>
+        <div class="muted">${(t.exercises || []).length} exercises</div>
+        <div class="tmpl-actions">
+          <button type="button" class="btn primary small btn-start-tmpl" data-id="${escapeHtml(t.id)}">Start</button>
+          <button type="button" class="btn ghost small btn-del-tmpl" data-id="${escapeHtml(t.id)}">Delete</button>
+        </div>
+      </div>`;
+    }).join('') || '<p class="muted">No templates yet. Tap + Template.</p>';
   }
 
   function partTagsHtml(map) {
@@ -713,32 +1001,7 @@
     return bits.join('');
   }
 
-  function renderWorkoutView() {
-    const pick = $('session-pick');
-    const active = $('session-active');
-    if (state.draft) {
-      pick.classList.add('hidden');
-      active.classList.remove('hidden');
-      $('workout-title').textContent = state.draft.name || state.draft.type;
-      $('active-type').textContent = state.draft.type;
-      $('active-time').textContent = 'In progress';
-      $('session-notes').value = state.draft.notes || '';
-      renderExercises();
-    } else {
-      pick.classList.remove('hidden');
-      active.classList.add('hidden');
-      $('workout-title').textContent = 'New session';
-      if (!renderWorkoutView._type) renderWorkoutView._type = 'Push';
-      $('session-types').innerHTML = SESSION_TYPES.map((t) =>
-        `<button type="button" class="chip ${renderWorkoutView._type === t ? 'selected' : ''}" data-type="${t}">${t}</button>`
-      ).join('');
-      $('session-name').value = '';
-    }
-    const dl = $('ex-library');
-    dl.innerHTML = EXERCISE_LIBRARY.map((e) => `<option value="${escapeHtml(e.name)}"></option>`).join('');
-  }
-
-  function renderExercises() {
+  function renderActiveExercises() {
     const list = $('exercise-list');
     if (!state.draft.exercises.length) {
       list.innerHTML = '<p class="muted small">Add exercises from the library or type a custom name.</p>';
@@ -778,98 +1041,235 @@
     }).join('');
   }
 
-  function renderHistory() {
-    const real = state.workouts.filter((w) => !w.isFreeze);
-    const hl = $('history-list');
-    if (!real.length) {
-      hl.innerHTML = '<span class="muted">No workouts yet.</span>';
-    } else {
-      hl.innerHTML = real.map((w) => {
-        const when = new Date(w.completedAt);
-        const detail = (w.exercises || []).map((e) => {
-          const done = e.sets.filter((s) => s.done);
-          return `${e.name}: ${done.map((s) => `${s.weight || 0}×${s.reps || 0}`).join(', ') || '—'}`;
-        }).join('\n');
-        return `<div class="hist-item" data-id="${w.id}">
-          <div class="left">
-            <strong>${escapeHtml(w.name)}</strong>
-            <div class="muted small">${when.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${w.type}</div>
-            <div class="hist-detail hidden" data-detail="${w.id}">${escapeHtml(detail)}${w.notes ? '\n\n' + escapeHtml(w.notes) : ''}</div>
-          </div>
-          <div class="muted small">+${w.xpAwarded || 0} XP</div>
-        </div>`;
-      }).join('');
+  function renderExercisesLib() {
+    const bodyFilters = [{ id: '', label: 'Any Body Part' }].concat(STAT_DEFS.map((s) => ({ id: s.id, label: s.label })));
+    $('filter-body').innerHTML = bodyFilters.map((f) =>
+      `<button type="button" class="chip ${ui.filterBody === f.id ? 'selected' : ''}" data-body="${f.id}">${f.label}</button>`
+    ).join('');
+    $('filter-cat').innerHTML = CATEGORIES.map((f) =>
+      `<button type="button" class="chip ${ui.filterCat === f.id ? 'selected' : ''}" data-cat="${f.id}">${f.label}</button>`
+    ).join('');
+
+    const q = ui.libSearch.trim().toLowerCase();
+    let list = allExercises().slice().sort((a, b) => a.name.localeCompare(b.name));
+    if (q) list = list.filter((e) => e.name.toLowerCase().includes(q));
+    if (ui.filterBody) {
+      list = list.filter((e) => (e.primary || []).includes(ui.filterBody) || (e.secondary || []).includes(ui.filterBody));
+    }
+    if (ui.filterCat) {
+      list = list.filter((e) => categoryOf(e) === ui.filterCat || (e.tags || []).includes(ui.filterCat));
     }
 
-    const prs = Object.entries(state.prs).sort((a, b) => b[1].e1rm - a[1].e1rm);
-    const pl = $('pr-list');
-    if (!prs.length) {
-      pl.innerHTML = '<span class="muted">PRs appear when you set a best set.</span>';
-    } else {
-      pl.innerHTML = prs.map(([name, p]) => `
-        <div class="pr-item">
-          <div><strong>${escapeHtml(name)}</strong>
-            <div class="muted small">est. 1RM ${p.e1rm} · ${new Date(p.date).toLocaleDateString()}</div>
-          </div>
-          <div><strong>${p.weight} × ${p.reps}</strong></div>
-        </div>`).join('');
+    const container = $('exercise-lib-list');
+    if (!list.length) {
+      container.innerHTML = '<p class="muted">No exercises match.</p>';
+      return;
+    }
+    let html = '';
+    let letter = '';
+    for (const ex of list) {
+      const L = ex.name[0].toUpperCase();
+      if (L !== letter) {
+        letter = L;
+        html += `<div class="ex-letter">${letter}</div>`;
+      }
+      const primary = (ex.primary || []).map((p) => STAT_LABELS[p] || p).join(', ') || '—';
+      const last = lastPerformance(ex.name);
+      html += `<div class="ex-lib-row">
+        <div>
+          <div class="name">${escapeHtml(ex.name)}</div>
+          <div class="part">${escapeHtml(primary)}</div>
+        </div>
+        <div class="last">${last ? escapeHtml(last.text) + `<span class="muted">${last.sub}</span>` : '<span class="muted">—</span>'}</div>
+      </div>`;
+    }
+    container.innerHTML = html;
+  }
+
+  function renderMeasure() {
+    const list = $('measure-list');
+    list.innerHTML = MEASURE_PARTS.map((p) => {
+      const hist = (state.measurements[p.id] || []);
+      const latest = hist.length ? hist[hist.length - 1] : null;
+      const val = latest ? `${latest.value} cm` : '—';
+      return `<div class="measure-row" data-id="${p.id}">
+        <div class="label">${escapeHtml(p.label)}</div>
+        <div style="display:flex;align-items:center">
+          <span class="value">${val}</span>
+          <button type="button" class="btn-plus" data-id="${p.id}" aria-label="Add ${escapeHtml(p.label)}">+</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    const wh = $('weight-history');
+    const log = state.bodyWeightLog || [];
+    if (!log.length) wh.textContent = 'No weight logged yet.';
+    else {
+      const recent = log.slice(-5).reverse();
+      wh.innerHTML = recent.map((e) => `${e.date}: <strong>${e.weight} kg</strong>`).join(' · ');
     }
   }
 
+  function renderSettings() {
+    $('setting-name').value = state.displayName;
+    const streak = computeStreak();
+    $('settings-streak').textContent = streak;
+    const weeks = weeksWithWorkouts();
+    const thisWeek = isoWeekKey(new Date());
+    const trained = weeks.has(thisWeek);
+    $('streak-detail').textContent = trained
+      ? `Trained this week · ${workoutsInIsoWeek(thisWeek)} session(s)`
+      : 'Train this week to keep the streak';
+    const freezeBtn = $('btn-freeze');
+    freezeBtn.hidden = !canUseFreeze();
+
+    const today = localDateKey(new Date());
+    const week = isoWeekKey(new Date());
+    const dailyDone = workoutsOnDate(today) >= 1;
+    const weeklyCount = workoutsInIsoWeek(week);
+    const weeklyDone = weeklyCount >= 3;
+    $('quests-list').innerHTML = `
+      <div class="quest ${dailyDone ? 'done' : ''}">
+        <div class="quest-icon">${dailyDone ? '✅' : '⚔️'}</div>
+        <div class="quest-body">
+          <strong>Daily: Complete a workout</strong>
+          <div class="muted">${dailyDone ? 'Claimed +25 XP' : 'Log any session today · +25 XP'}</div>
+          <div class="quest-progress"><i style="width:${dailyDone ? 100 : 0}%"></i></div>
+        </div>
+      </div>
+      <div class="quest ${weeklyDone ? 'done' : ''}">
+        <div class="quest-icon">${weeklyDone ? '🏆' : '🐉'}</div>
+        <div class="quest-body">
+          <strong>Weekly boss: Hit 3 sessions</strong>
+          <div class="muted">${weeklyCount}/3 this week · +60 XP</div>
+          <div class="quest-progress"><i style="width:${Math.min(100, (weeklyCount / 3) * 100)}%"></i></div>
+        </div>
+      </div>`;
+  }
+
   function renderAll() {
-    renderHome();
+    renderProfile();
     renderHistory();
+  }
+
+  function openTemplateDialog() {
+    ui.templatePick = new Set();
+    $('template-name').value = '';
+    const pick = $('template-ex-pick');
+    pick.innerHTML = allExercises().slice().sort((a, b) => a.name.localeCompare(b.name)).map((e) =>
+      `<button type="button" class="chip" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`
+    ).join('');
+    $('template-dialog').showModal();
+  }
+
+  function openNewExerciseDialog() {
+    const prim = $('new-ex-primary');
+    const sec = $('new-ex-secondary');
+    prim.innerHTML = STAT_DEFS.map((s) => `<option value="${s.id}">${s.label}</option>`).join('');
+    sec.innerHTML = '<option value="">— None —</option>' + STAT_DEFS.map((s) => `<option value="${s.id}">${s.label}</option>`).join('');
+    $('new-ex-name').value = '';
+    $('new-ex-dialog').showModal();
   }
 
   function bind() {
     document.querySelectorAll('.tab').forEach((t) => {
       t.addEventListener('click', () => showView(t.dataset.view));
     });
-    $('btn-log').addEventListener('click', () => showView('workout'));
-    $('btn-settings').addEventListener('click', () => showView('settings'));
-    $('btn-settings-back').addEventListener('click', () => showView('home'));
-    $('btn-workout-back').addEventListener('click', () => showView('home'));
 
-    $('session-types').addEventListener('click', (e) => {
-      const chip = e.target.closest('.chip');
-      if (!chip) return;
-      renderWorkoutView._type = chip.dataset.type;
-      renderWorkoutView();
+    $('btn-settings').addEventListener('click', () => showView('settings'));
+    $('btn-settings-back').addEventListener('click', () => showView(ui.previousView || 'profile'));
+    $('btn-toggle-stats').addEventListener('click', () => {
+      state.statsExpanded = !state.statsExpanded;
+      save();
+      renderProfile();
     });
 
-    $('btn-start-session').addEventListener('click', () => {
-      const type = renderWorkoutView._type || 'Push';
-      const custom = $('session-name').value.trim();
-      state.draft = {
-        type,
-        name: custom || type,
-        notes: '',
-        startedAt: new Date().toISOString(),
-        exercises: []
+    $('btn-add-widget').addEventListener('click', () => {
+      const w = state.widgets || defaultWidgets();
+      $('wig-wpw').checked = !!w.workoutsPerWeek;
+      $('wig-bw').checked = !!w.bodyWeight;
+      $('wig-cal').checked = !!w.caloricIntake;
+      $('widget-dialog').showModal();
+    });
+    $('widget-dialog').addEventListener('close', () => {
+      if ($('widget-dialog').returnValue !== 'ok') return;
+      state.widgets = {
+        workoutsPerWeek: $('wig-wpw').checked,
+        bodyWeight: $('wig-bw').checked,
+        caloricIntake: $('wig-cal').checked
       };
       save();
-      renderWorkoutView();
+      renderWidgets();
+      toast('Widgets updated');
+    });
+
+    $('btn-empty-workout').addEventListener('click', () => {
+      startWorkout({ type: 'Custom', name: 'Empty Workout', exercises: [] });
+    });
+
+    $('btn-new-template').addEventListener('click', openTemplateDialog);
+    $('template-cancel').addEventListener('click', () => $('template-dialog').close());
+    $('template-ex-pick').addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      const name = chip.dataset.name;
+      if (ui.templatePick.has(name)) {
+        ui.templatePick.delete(name);
+        chip.classList.remove('selected');
+      } else {
+        ui.templatePick.add(name);
+        chip.classList.add('selected');
+      }
+    });
+    $('template-save').addEventListener('click', () => {
+      const name = $('template-name').value.trim();
+      if (!name) { toast('Name required'); return; }
+      if (!ui.templatePick.size) { toast('Pick at least one exercise'); return; }
+      state.templates.push({
+        id: 'tmpl-' + Date.now(),
+        name,
+        exercises: [...ui.templatePick]
+      });
+      save();
+      $('template-dialog').close();
+      renderTemplates();
+      toast('Template saved');
+    });
+
+    $('templates-grid').addEventListener('click', async (e) => {
+      const start = e.target.closest('.btn-start-tmpl');
+      if (start) {
+        const t = state.templates.find((x) => x.id === start.dataset.id);
+        if (!t) return;
+        startWorkout({ type: 'Custom', name: t.name, exercises: t.exercises.slice() });
+        return;
+      }
+      const del = e.target.closest('.btn-del-tmpl');
+      if (del) {
+        const ok = await confirmDialog('Delete template?', 'This cannot be undone.');
+        if (!ok) return;
+        state.templates = state.templates.filter((x) => x.id !== del.dataset.id);
+        save();
+        renderTemplates();
+        toast('Template deleted');
+      }
+    });
+
+    $('btn-workout-back').addEventListener('click', () => {
+      // Keep draft; leave Start for Profile — return via + to resume
+      if (state.draft) toast('Draft saved — tap + to resume');
+      showView('profile');
     });
 
     $('btn-add-ex').addEventListener('click', () => {
       if (!state.draft) return;
       const name = $('ex-search').value.trim();
       if (!name) return;
-      state.draft.exercises.push({
-        name,
-        notes: '',
-        rpe: '',
-        sets: [
-          { weight: '', reps: '', rpe: '', done: false },
-          { weight: '', reps: '', rpe: '', done: false },
-          { weight: '', reps: '', rpe: '', done: false }
-        ]
-      });
+      state.draft.exercises.push({ name, notes: '', rpe: '', sets: makeEmptySets() });
       $('ex-search').value = '';
       save();
-      renderExercises();
+      renderActiveExercises();
     });
-
     $('ex-search').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); $('btn-add-ex').click(); }
     });
@@ -879,33 +1279,30 @@
       if (rem) {
         state.draft.exercises.splice(Number(rem.dataset.ei), 1);
         save();
-        renderExercises();
+        renderActiveExercises();
         return;
       }
       const add = e.target.closest('.btn-add-set');
       if (add) {
         state.draft.exercises[Number(add.dataset.ei)].sets.push({ weight: '', reps: '', rpe: '', done: false });
         save();
-        renderExercises();
+        renderActiveExercises();
         return;
       }
       const chk = e.target.closest('.set-check');
       if (chk) {
-        const ei = Number(chk.dataset.ei);
-        const si = Number(chk.dataset.si);
-        const set = state.draft.exercises[ei].sets[si];
+        const set = state.draft.exercises[Number(chk.dataset.ei)].sets[Number(chk.dataset.si)];
         set.done = !set.done;
         save();
-        renderExercises();
+        renderActiveExercises();
       }
     });
 
     $('exercise-list').addEventListener('input', (e) => {
       const t = e.target;
       if (t.matches('input[data-f]')) {
-        const ei = Number(t.dataset.ei);
-        const si = Number(t.dataset.si);
-        state.draft.exercises[ei].sets[si][t.dataset.f] = t.value === '' ? '' : Number(t.value);
+        state.draft.exercises[Number(t.dataset.ei)].sets[Number(t.dataset.si)][t.dataset.f] =
+          t.value === '' ? '' : Number(t.value);
         save();
       }
       if (t.matches('.ex-notes')) {
@@ -928,7 +1325,8 @@
       if (!ok) return;
       state.draft = null;
       save();
-      showView('home');
+      renderStartView();
+      toast('Session discarded');
     });
 
     $('btn-freeze').addEventListener('click', applyFreeze);
@@ -940,21 +1338,102 @@
       if (det) det.classList.toggle('hidden');
     });
 
+    $('lib-search').addEventListener('input', () => {
+      ui.libSearch = $('lib-search').value;
+      renderExercisesLib();
+    });
+    $('filter-body').addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      ui.filterBody = chip.dataset.body || '';
+      renderExercisesLib();
+    });
+    $('filter-cat').addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      ui.filterCat = chip.dataset.cat || '';
+      renderExercisesLib();
+    });
+
+    $('btn-new-exercise').addEventListener('click', openNewExerciseDialog);
+    $('new-ex-cancel').addEventListener('click', () => $('new-ex-dialog').close());
+    $('new-ex-save').addEventListener('click', () => {
+      const name = $('new-ex-name').value.trim();
+      if (!name) { toast('Name required'); return; }
+      if (allExercises().some((e) => e.name.toLowerCase() === name.toLowerCase())) {
+        toast('Exercise already exists');
+        return;
+      }
+      const primary = $('new-ex-primary').value;
+      const secondary = $('new-ex-secondary').value;
+      const tags = [];
+      if (ACTIVITY_STATS.has(primary)) tags.push('activity', primary);
+      state.customExercises.push({
+        name,
+        primary: [primary],
+        secondary: secondary ? [secondary] : [],
+        tags
+      });
+      save();
+      $('new-ex-dialog').close();
+      renderExercisesLib();
+      toast('Exercise added');
+    });
+
+    $('measure-list').addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-plus');
+      if (!btn) return;
+      ui.measureTarget = btn.dataset.id;
+      const part = MEASURE_PARTS.find((p) => p.id === ui.measureTarget);
+      $('measure-dlg-title').textContent = part ? part.label : 'Log measurement';
+      $('measure-value').value = '';
+      $('measure-dialog').showModal();
+      setTimeout(() => $('measure-value').focus(), 50);
+    });
+    $('measure-dialog').addEventListener('close', () => {
+      if ($('measure-dialog').returnValue !== 'ok' || !ui.measureTarget) return;
+      const val = Number($('measure-value').value);
+      if (!val || val <= 0) { toast('Enter a positive value'); return; }
+      if (!state.measurements[ui.measureTarget]) state.measurements[ui.measureTarget] = [];
+      state.measurements[ui.measureTarget].push({
+        date: localDateKey(new Date()),
+        value: Math.round(val * 10) / 10
+      });
+      save();
+      renderMeasure();
+      toast('Measurement saved');
+      ui.measureTarget = null;
+    });
+
+    $('btn-log-weight').addEventListener('click', () => {
+      const val = Number($('weight-input').value);
+      if (!val || val <= 0) { toast('Enter weight in kg'); return; }
+      state.bodyWeightLog.push({
+        date: localDateKey(new Date()),
+        weight: Math.round(val * 10) / 10
+      });
+      $('weight-input').value = '';
+      save();
+      renderMeasure();
+      renderWidgets();
+      toast('Weight logged');
+    });
+
     $('btn-save-name').addEventListener('click', () => {
       const n = $('setting-name').value.trim() || 'Long';
       state.displayName = n.slice(0, 24);
       save();
       toast('Name saved');
-      renderHome();
+      renderProfile();
     });
 
     $('btn-reset').addEventListener('click', async () => {
-      const ok = await confirmDialog('Reset all data?', 'This wipes workouts, XP, stats, PRs, and streak. Cannot undo.');
+      const ok = await confirmDialog('Reset all data?', 'This wipes workouts, XP, stats, PRs, streak, templates, and measurements. Cannot undo.');
       if (!ok) return;
       state = defaultState();
       save();
       toast('Data reset');
-      showView('home');
+      showView('profile');
       renderAll();
     });
   }
@@ -970,6 +1449,6 @@
   save();
   bind();
   renderAll();
-  showView('home');
+  showView(state.draft ? 'start' : 'profile');
   registerSW();
 })();
