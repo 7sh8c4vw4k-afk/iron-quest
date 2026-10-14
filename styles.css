@@ -614,6 +614,8 @@ body.modal-open {
   margin-bottom: 8px;
 }
 .ex-head strong { font-size: 0.95rem; }
+.ex-head-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.btn-move-ex:disabled { opacity: 0.35; cursor: default; }
 .ex-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .tag {
   font-size: 0.65rem;
@@ -794,6 +796,16 @@ body.modal-open {
   max-width: 300px;
   margin: 0 auto;
 }
+.log-recent-section { margin-top: 8px; margin-bottom: 12px; }
+.log-recent-section .section-head { margin-top: 0; margin-bottom: 8px; }
+.log-recent-section .section-head h2 {
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0.04em;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .log-pr-section .section-head { margin-top: 0; }
 .log-pr-section .section-head h2 {
   color: var(--amber2);
@@ -1011,6 +1023,48 @@ dialog::backdrop { background: rgba(0,0,0,0.7); }
 }
 .check-row input { width: 18px; height: 18px; accent-color: var(--orange); }
 
+.template-order {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.template-order-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 8px 4px;
+}
+.template-order-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.template-order-item .ord-num {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 1.4em;
+}
+.template-order-item .ord-name {
+  flex: 1;
+  font-size: 0.88rem;
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.template-order-item .ord-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
 .template-pick {
   max-height: 240px;
   overflow-y: auto;
@@ -1036,3 +1090,23 @@ dialog.fallback-open {
   margin: 0;
 }
 dialog.fallback-open::backdrop { display: none; }
+
+
+/* Cloud backup (Profile) */
+.cloud-backup-card .section-head h2 {
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0.04em;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.cloud-backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.cloud-backup-card code {
+  font-size: 0.78rem;
+  word-break: break-all;
+}

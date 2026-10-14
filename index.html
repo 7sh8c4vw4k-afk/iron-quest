@@ -12,8 +12,8 @@
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
   <title>Iron Quest</title>
-  <!-- cache bust v11 -->
-  <link rel="stylesheet" href="./styles.css?v=12" />
+  <!-- cache bust v13 -->
+  <link rel="stylesheet" href="./styles.css?v=13" />
 </head>
 <body>
   <div id="app">
@@ -47,6 +47,27 @@
         <div class="stats-grid compact" id="stats-grid"></div>
       </section>
 
+      <section class="card cloud-backup-card" id="cloud-backup-card">
+        <div class="section-head">
+          <h2>Cloud backup</h2>
+        </div>
+        <p class="muted small" id="drive-setup-help" hidden>
+          Create a Google Cloud OAuth <strong>Web</strong> client ID, add authorized origin
+          <code>https://7sh8c4vw4k-afk.github.io</code>, then paste the ID into <code>config.js</code>
+          (<code>GOOGLE_DRIVE_CLIENT_ID</code>). Until then, data stays on this device only.
+        </p>
+        <div id="drive-controls" hidden>
+          <p class="muted small" id="drive-status">Not connected</p>
+          <p class="muted small" id="drive-last-backup"></p>
+          <div class="cloud-backup-actions">
+            <button type="button" class="btn secondary" id="btn-drive-connect">Connect Google</button>
+            <button type="button" class="btn ghost" id="btn-drive-disconnect" hidden>Disconnect</button>
+            <button type="button" class="btn primary" id="btn-drive-backup" hidden>Backup now</button>
+            <button type="button" class="btn ghost" id="btn-drive-restore" hidden>Restore from Drive</button>
+          </div>
+        </div>
+      </section>
+
       <div id="widgets-area"></div>
       <button type="button" class="btn ghost big" id="btn-add-widget">+ Widget</button>
     </main>
@@ -71,6 +92,13 @@
 
       <section class="card flat log-day-section">
         <div id="history-list" class="history-list muted"></div>
+      </section>
+
+      <section class="card flat log-recent-section" id="log-recent-section" hidden>
+        <div class="section-head">
+          <h2>Recent</h2>
+        </div>
+        <div id="recent-list" class="history-list muted"></div>
       </section>
 
       <section class="card log-pr-section">
@@ -197,7 +225,7 @@
       <section class="card">
         <h3>About</h3>
         <p class="muted small">Iron Quest stores everything locally in <code>iron-quest-v1</code>. Install from Share → Add to Home Screen on iPhone.</p>
-        <p class="muted small">Version 2.6 · Chest & Back Tonight · Body-part RPG · SW iron-quest-v12</p>
+        <p class="muted small">Version 2.7 · Recent Log · Reorder · Drive backup · SW iron-quest-v13</p>
       </section>
       <section class="card danger-zone">
         <h3>Reset</h3>
@@ -283,6 +311,8 @@
         <span>Name</span>
         <input type="text" id="template-name" maxlength="40" placeholder="e.g. Push A" />
       </label>
+      <label class="field"><span>Selected order</span></label>
+      <div id="template-ex-order" class="template-order"></div>
       <label class="field"><span>Exercises (tap to toggle)</span></label>
       <div id="template-ex-pick" class="template-pick"></div>
       <div class="row-actions">
@@ -349,6 +379,8 @@
     </div>
   </div>
 
-  <script src="./app.js?v=12"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="./config.js?v=13"></script>
+  <script src="./app.js?v=13"></script>
 </body>
 </html>

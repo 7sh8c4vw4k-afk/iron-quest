@@ -1,11 +1,13 @@
-const CACHE = 'iron-quest-v12';
+const CACHE = 'iron-quest-v13';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
-  './styles.css?v=12',
+  './styles.css?v=13',
   './app.js',
-  './app.js?v=12',
+  './app.js?v=13',
+  './config.js',
+  './config.js?v=13',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',

@@ -322,6 +322,7 @@
     filterCat: '',
     measureTarget: null,
     templatePick: new Set(),
+    templatePickOrder: [],
     previousView: 'profile',
     addExSearch: '',
     addExToDraftAfterCreate: false,
@@ -776,6 +777,7 @@
     toast(msg);
     showView('profile');
     renderAll();
+    scheduleDriveAutoBackup();
   }
 
   function lastPerformance(exName) {
@@ -1002,6 +1004,7 @@
     }).join('');
 
     renderWidgets();
+    renderDriveUI();
   }
 
   function workoutsPerWeekData() {
@@ -1129,10 +1132,38 @@
     cal.innerHTML = cells.join('');
   }
 
+  function histItemHtml(w, opts) {
+    const showDate = !!(opts && opts.showDate);
+    const when = new Date(w.completedAt);
+    const timeStr = when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    const whenLabel = showDate
+      ? when.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' + timeStr
+      : timeStr + ' · ' + (w.type || '');
+    const exNames = (w.exercises || []).map((e) => e.name).slice(0, 4).join(', ');
+    const more = (w.exercises || []).length > 4 ? '…' : '';
+    const detail = (w.exercises || []).map((e) => {
+      const done = (e.sets || []).filter((s) => s.done);
+      return `${e.name}: ${done.map((s) => `${s.weight || 0}×${s.reps || 0}`).join(', ') || '—'}`;
+    }).join('\n');
+    return `<div class="hist-item" data-id="${w.id}">
+          <div class="left">
+            <strong>${escapeHtml(w.name)}</strong>
+            <div class="muted small">${escapeHtml(whenLabel)}</div>
+            <div class="muted small">${escapeHtml(exNames)}${more}</div>
+            <div class="hist-detail hidden" data-detail="${w.id}">${escapeHtml(detail)}${w.notes ? '\n\n' + escapeHtml(w.notes) : ''}</div>
+          </div>
+          <div class="muted small">+${w.xpAwarded || 0} XP</div>
+        </div>`;
+  }
+
+  function realWorkoutHistory() {
+    return state.workouts.filter((w) => !w.isFreeze && w.completedAt);
+  }
+
   function renderLogDayList() {
     const hl = $('history-list');
     if (!hl) return;
-    const real = state.workouts.filter((w) => !w.isFreeze);
+    const real = realWorkoutHistory();
     if (!real.length) {
       hl.innerHTML = '<p class="log-empty">This screen is dedicated for workout records. It will stay empty until you save your first workout record.</p>';
       return;
@@ -1142,24 +1173,24 @@
       hl.innerHTML = '<p class="log-empty">No workouts on this day.</p>';
       return;
     }
-    hl.innerHTML = dayWorkouts.map((w) => {
-      const when = new Date(w.completedAt);
-      const exNames = (w.exercises || []).map((e) => e.name).slice(0, 4).join(', ');
-      const more = (w.exercises || []).length > 4 ? '…' : '';
-      const detail = (w.exercises || []).map((e) => {
-        const done = (e.sets || []).filter((s) => s.done);
-        return `${e.name}: ${done.map((s) => `${s.weight || 0}×${s.reps || 0}`).join(', ') || '—'}`;
-      }).join('\n');
-      return `<div class="hist-item" data-id="${w.id}">
-          <div class="left">
-            <strong>${escapeHtml(w.name)}</strong>
-            <div class="muted small">${when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} · ${escapeHtml(w.type || '')}</div>
-            <div class="muted small">${escapeHtml(exNames)}${more}</div>
-            <div class="hist-detail hidden" data-detail="${w.id}">${escapeHtml(detail)}${w.notes ? '\n\n' + escapeHtml(w.notes) : ''}</div>
-          </div>
-          <div class="muted small">+${w.xpAwarded || 0} XP</div>
-        </div>`;
-    }).join('');
+    hl.innerHTML = dayWorkouts.map((w) => histItemHtml(w, { showDate: false })).join('');
+  }
+
+  function renderLogRecent() {
+    const section = $('log-recent-section');
+    const list = $('recent-list');
+    if (!section || !list) return;
+    const real = realWorkoutHistory()
+      .slice()
+      .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
+      .slice(0, 20);
+    if (!real.length) {
+      section.hidden = true;
+      list.innerHTML = '';
+      return;
+    }
+    section.hidden = false;
+    list.innerHTML = real.map((w) => histItemHtml(w, { showDate: true })).join('');
   }
 
   function renderLogPrs() {
@@ -1186,6 +1217,7 @@
   function renderLog() {
     renderLogCalendar();
     renderLogDayList();
+    renderLogRecent();
     renderLogPrs();
   }
 
@@ -1265,6 +1297,7 @@
     list.innerHTML = state.draft.exercises.map((ex, ei) => {
       const map = lookupExercise(ex.name);
       const compound = isCompound(ex.name, map.tags);
+      const last = state.draft.exercises.length - 1;
       return `<div class="ex-card" data-ei="${ei}">
         <div class="ex-head">
           <div>
@@ -1274,7 +1307,11 @@
               ${partTagsHtml(map)}
             </div>
           </div>
-          <button type="button" class="btn ghost small btn-remove-ex" data-ei="${ei}">✕</button>
+          <div class="ex-head-actions">
+            <button type="button" class="btn ghost small btn-move-ex" data-ei="${ei}" data-dir="-1" aria-label="Move up"${ei === 0 ? ' disabled' : ''}>↑</button>
+            <button type="button" class="btn ghost small btn-move-ex" data-ei="${ei}" data-dir="1" aria-label="Move down"${ei === last ? ' disabled' : ''}>↓</button>
+            <button type="button" class="btn ghost small btn-remove-ex" data-ei="${ei}">✕</button>
+          </div>
         </div>
         <table class="sets-table">
           <thead><tr><th>#</th><th>kg</th><th>reps</th><th>RPE</th><th>✓</th></tr></thead>
@@ -1463,12 +1500,54 @@
     setTimeout(() => { if (input) input.focus(); }, 80);
   }
 
+  function moveArrayItem(arr, index, dir) {
+    const j = index + dir;
+    if (j < 0 || j >= arr.length) return false;
+    const tmp = arr[index];
+    arr[index] = arr[j];
+    arr[j] = tmp;
+    return true;
+  }
+
+  function renderTemplatePickUI() {
+    const orderEl = $('template-ex-order');
+    const pick = $('template-ex-pick');
+    if (orderEl) {
+      if (!ui.templatePickOrder.length) {
+        orderEl.innerHTML = '<div class="template-order-empty">Tap exercises below to add them in order.</div>';
+      } else {
+        orderEl.innerHTML = ui.templatePickOrder.map((name, i) => {
+          const last = ui.templatePickOrder.length - 1;
+          return `<div class="template-order-item" data-idx="${i}">
+            <span class="ord-num">${i + 1}</span>
+            <span class="ord-name">${escapeHtml(name)}</span>
+            <div class="ord-actions">
+              <button type="button" class="btn ghost small btn-tmpl-move" data-idx="${i}" data-dir="-1" aria-label="Move up"${i === 0 ? ' disabled' : ''}>↑</button>
+              <button type="button" class="btn ghost small btn-tmpl-move" data-idx="${i}" data-dir="1" aria-label="Move down"${i === last ? ' disabled' : ''}>↓</button>
+              <button type="button" class="btn ghost small btn-tmpl-remove" data-idx="${i}" aria-label="Remove">✕</button>
+            </div>
+          </div>`;
+        }).join('');
+      }
+    }
+    if (pick) {
+      pick.innerHTML = allExercises().slice().sort((a, b) => a.name.localeCompare(b.name)).map((e) =>
+        `<button type="button" class="chip ${ui.templatePick.has(e.name) ? 'selected' : ''}" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`
+      ).join('');
+    }
+  }
+
   function openTemplateDialog(editId) {
     ui.editingTemplateId = editId || null;
     ui.templatePick = new Set();
+    ui.templatePickOrder = [];
     const existing = editId ? (state.templates || []).find((t) => t.id === editId) : null;
     if (existing) {
-      (existing.exercises || []).forEach((n) => ui.templatePick.add(n));
+      (existing.exercises || []).forEach((n) => {
+        if (!n) return;
+        ui.templatePick.add(n);
+        ui.templatePickOrder.push(n);
+      });
       $('template-name').value = existing.name || '';
       const title = $('template-dlg-title');
       if (title) title.textContent = 'Edit routine';
@@ -1477,10 +1556,7 @@
       const title = $('template-dlg-title');
       if (title) title.textContent = 'New routine';
     }
-    const pick = $('template-ex-pick');
-    pick.innerHTML = allExercises().slice().sort((a, b) => a.name.localeCompare(b.name)).map((e) =>
-      `<button type="button" class="chip ${ui.templatePick.has(e.name) ? 'selected' : ''}" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</button>`
-    ).join('');
+    renderTemplatePickUI();
     safeShowDialog($('template-dialog'));
   }
 
@@ -1521,6 +1597,381 @@
     if (nameEl) nameEl.value = '';
     openModal('new-ex-modal');
   }
+
+
+  /* ——— Google Drive backup (GIS token + Drive API v3) ——— */
+  const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+  const DRIVE_FILE_NAME = 'iron-quest-backup.json';
+  const DRIVE_FILE_ID_KEY = 'iron-quest-drive-file-id';
+  const DRIVE_CONNECTED_KEY = 'iron-quest-drive-connected';
+  const DRIVE_LAST_KEY = 'iron-quest-drive-last-backup';
+
+  const drive = {
+    token: null,
+    tokenExpiresAt: 0,
+    tokenClient: null,
+    backupTimer: null,
+    busy: false
+  };
+
+  function driveClientId() {
+    const cfg = window.IRON_QUEST_CONFIG || {};
+    return (cfg.GOOGLE_DRIVE_CLIENT_ID || '').trim();
+  }
+
+  function driveConfigured() {
+    return !!driveClientId();
+  }
+
+  function driveWasConnected() {
+    try { return localStorage.getItem(DRIVE_CONNECTED_KEY) === '1'; } catch (_) { return false; }
+  }
+
+  function setDriveConnected(on) {
+    try {
+      if (on) localStorage.setItem(DRIVE_CONNECTED_KEY, '1');
+      else localStorage.removeItem(DRIVE_CONNECTED_KEY);
+    } catch (_) {}
+  }
+
+  function getDriveFileId() {
+    try { return localStorage.getItem(DRIVE_FILE_ID_KEY) || ''; } catch (_) { return ''; }
+  }
+
+  function setDriveFileId(id) {
+    try {
+      if (id) localStorage.setItem(DRIVE_FILE_ID_KEY, id);
+      else localStorage.removeItem(DRIVE_FILE_ID_KEY);
+    } catch (_) {}
+  }
+
+  function getDriveLastBackup() {
+    try { return localStorage.getItem(DRIVE_LAST_KEY) || ''; } catch (_) { return ''; }
+  }
+
+  function setDriveLastBackup(iso) {
+    try {
+      if (iso) localStorage.setItem(DRIVE_LAST_KEY, iso);
+      else localStorage.removeItem(DRIVE_LAST_KEY);
+    } catch (_) {}
+  }
+
+  function setDriveStatus(text) {
+    const el = $('drive-status');
+    if (el) el.textContent = text || '';
+  }
+
+  function renderDriveUI() {
+    const help = $('drive-setup-help');
+    const controls = $('drive-controls');
+    const btnConnect = $('btn-drive-connect');
+    const btnDisconnect = $('btn-drive-disconnect');
+    const btnBackup = $('btn-drive-backup');
+    const btnRestore = $('btn-drive-restore');
+    const lastEl = $('drive-last-backup');
+    if (!controls) return;
+
+    if (!driveConfigured()) {
+      if (help) help.hidden = false;
+      controls.hidden = true;
+      return;
+    }
+    if (help) help.hidden = true;
+    controls.hidden = false;
+
+    const signedIn = !!(drive.token && drive.tokenExpiresAt > Date.now());
+    const connected = signedIn || driveWasConnected();
+    if (btnConnect) {
+      btnConnect.hidden = signedIn;
+      btnConnect.textContent = connected && !signedIn ? 'Reconnect Google' : 'Connect Google';
+    }
+    if (btnDisconnect) btnDisconnect.hidden = !connected;
+    if (btnBackup) btnBackup.hidden = !signedIn;
+    if (btnRestore) btnRestore.hidden = !signedIn;
+
+    if (signedIn) setDriveStatus('Connected · auto-backup on');
+    else if (connected) setDriveStatus('Saved connection · tap Reconnect to authorize this session');
+    else setDriveStatus('Not connected');
+
+    const last = getDriveLastBackup();
+    if (lastEl) {
+      if (last) {
+        try {
+          lastEl.textContent = 'Last backup: ' + new Date(last).toLocaleString();
+        } catch (_) {
+          lastEl.textContent = 'Last backup: ' + last;
+        }
+      } else {
+        lastEl.textContent = 'No Drive backup yet.';
+      }
+    }
+  }
+
+  function ensureDriveTokenClient() {
+    if (drive.tokenClient) return true;
+    if (!driveConfigured()) return false;
+    if (!window.google || !google.accounts || !google.accounts.oauth2) return false;
+    drive.tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: driveClientId(),
+      scope: DRIVE_SCOPE,
+      callback: () => {}
+    });
+    return true;
+  }
+
+  function requestDriveToken(interactive) {
+    return new Promise((resolve, reject) => {
+      if (!driveConfigured()) {
+        reject(new Error('Client ID not configured'));
+        return;
+      }
+      if (!ensureDriveTokenClient()) {
+        reject(new Error('Google sign-in still loading — try again in a moment'));
+        return;
+      }
+      drive.tokenClient.callback = (resp) => {
+        if (resp && resp.error) {
+          reject(new Error(resp.error));
+          return;
+        }
+        if (!resp || !resp.access_token) {
+          reject(new Error('No access token'));
+          return;
+        }
+        drive.token = resp.access_token;
+        const expiresIn = Number(resp.expires_in) || 3600;
+        drive.tokenExpiresAt = Date.now() + (expiresIn - 60) * 1000;
+        setDriveConnected(true);
+        renderDriveUI();
+        resolve(drive.token);
+      };
+      const opts = interactive ? { prompt: 'consent' } : { prompt: '' };
+      try {
+        drive.tokenClient.requestAccessToken(opts);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  async function getValidDriveToken(interactiveIfNeeded) {
+    if (drive.token && drive.tokenExpiresAt > Date.now()) return drive.token;
+    try {
+      return await requestDriveToken(false);
+    } catch (_) {
+      if (!interactiveIfNeeded) throw new Error('Not signed in');
+      return requestDriveToken(true);
+    }
+  }
+
+  function buildDrivePayload() {
+    return {
+      exportedAt: new Date().toISOString(),
+      app: 'iron-quest',
+      version: state.version || 3,
+      state: JSON.parse(JSON.stringify(state))
+    };
+  }
+
+  async function driveFetch(url, options) {
+    const token = await getValidDriveToken(!!(options && options.interactive));
+    const headers = Object.assign({}, (options && options.headers) || {}, {
+      Authorization: 'Bearer ' + token
+    });
+    const res = await fetch(url, Object.assign({}, options || {}, { headers }));
+    if (res.status === 401) {
+      drive.token = null;
+      drive.tokenExpiresAt = 0;
+      throw new Error('Drive auth expired — reconnect');
+    }
+    return res;
+  }
+
+  async function findDriveBackupFileId() {
+    const q = encodeURIComponent("name='" + DRIVE_FILE_NAME + "' and trashed=false");
+    const res = await driveFetch(
+      'https://www.googleapis.com/drive/v3/files?q=' + q + '&spaces=drive&fields=files(id,name,modifiedTime)&pageSize=5',
+      { interactive: false }
+    );
+    if (!res.ok) throw new Error('Drive search failed (' + res.status + ')');
+    const data = await res.json();
+    const files = (data && data.files) || [];
+    if (!files.length) return '';
+    files.sort((a, b) => String(b.modifiedTime || '').localeCompare(String(a.modifiedTime || '')));
+    return files[0].id || '';
+  }
+
+  async function ensureDriveFileId() {
+    let id = getDriveFileId();
+    if (id) return id;
+    id = await findDriveBackupFileId();
+    if (id) {
+      setDriveFileId(id);
+      return id;
+    }
+    return '';
+  }
+
+  async function uploadDriveBackup(opts) {
+    const interactive = !!(opts && opts.interactive);
+    const auto = !!(opts && opts.auto);
+    const quiet = !!(opts && opts.quiet);
+    if (!driveConfigured()) return;
+    if (drive.busy) return;
+    drive.busy = true;
+    try {
+      await getValidDriveToken(interactive);
+      const payload = buildDrivePayload();
+      const body = JSON.stringify(payload, null, 2);
+      let fileId = await ensureDriveFileId();
+      let res;
+      if (fileId) {
+        res = await driveFetch(
+          'https://www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(fileId) + '?uploadType=media',
+          {
+            method: 'PATCH',
+            interactive,
+            headers: { 'Content-Type': 'application/json' },
+            body
+          }
+        );
+        if (res.status === 404) {
+          setDriveFileId('');
+          fileId = '';
+        }
+      }
+      if (!fileId) {
+        const meta = { name: DRIVE_FILE_NAME, mimeType: 'application/json' };
+        const boundary = 'iq_' + Date.now();
+        const multipart =
+          '--' + boundary + '\r\n' +
+          'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+          JSON.stringify(meta) + '\r\n' +
+          '--' + boundary + '\r\n' +
+          'Content-Type: application/json\r\n\r\n' +
+          body + '\r\n' +
+          '--' + boundary + '--';
+        res = await driveFetch(
+          'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime',
+          {
+            method: 'POST',
+            interactive,
+            headers: { 'Content-Type': 'multipart/related; boundary=' + boundary },
+            body: multipart
+          }
+        );
+        if (!res.ok) throw new Error('Drive create failed (' + res.status + ')');
+        const created = await res.json();
+        fileId = created.id;
+        setDriveFileId(fileId);
+      } else if (res && !res.ok) {
+        throw new Error('Drive update failed (' + res.status + ')');
+      }
+      const when = new Date().toISOString();
+      setDriveLastBackup(when);
+      setDriveStatus('Backed up · ' + new Date(when).toLocaleString());
+      renderDriveUI();
+      if (!quiet) toast('Backed up to Drive');
+    } catch (err) {
+      console.warn('[Iron Quest] Drive backup failed:', err);
+      setDriveStatus('Backup failed: ' + (err && err.message ? err.message : 'unknown'));
+      // Auto backup: silent fail (status line only). Manual: toast.
+      if (!quiet && !auto) toast('Drive backup failed');
+    } finally {
+      drive.busy = false;
+    }
+  }
+
+  function scheduleDriveAutoBackup() {
+    if (!driveConfigured()) return;
+    if (!(drive.token && drive.tokenExpiresAt > Date.now()) && !driveWasConnected()) return;
+    clearTimeout(drive.backupTimer);
+    drive.backupTimer = setTimeout(() => {
+      // Success toasts "Backed up to Drive"; failures stay on status line only.
+      uploadDriveBackup({ interactive: false, auto: true, quiet: false }).catch(() => {});
+    }, 1200);
+  }
+
+  async function restoreFromDrive() {
+    if (!driveConfigured()) return;
+    try {
+      await getValidDriveToken(true);
+      let fileId = await ensureDriveFileId();
+      if (!fileId) {
+        toast('No iron-quest-backup.json found on Drive');
+        setDriveStatus('No backup file on Drive');
+        return;
+      }
+      const res = await driveFetch(
+        'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?alt=media',
+        { interactive: true }
+      );
+      if (!res.ok) throw new Error('Download failed (' + res.status + ')');
+      const data = await res.json();
+      const incoming = data && data.state ? data.state : data;
+      if (!incoming || typeof incoming !== 'object') throw new Error('Invalid backup file');
+      const ok = await confirmDialog(
+        'Restore from Drive?',
+        'This replaces all local Iron Quest data with the Drive backup. Cannot undo.'
+      );
+      if (!ok) return;
+      const base = defaultState();
+      state = {
+        ...base,
+        ...incoming,
+        version: 3,
+        stats: normalizeStats(incoming.stats),
+        questsClaimed: { ...base.questsClaimed, ...(incoming.questsClaimed || {}) },
+        prs: incoming.prs && typeof incoming.prs === 'object' ? incoming.prs : {},
+        workouts: Array.isArray(incoming.workouts) ? incoming.workouts : [],
+        widgets: { ...defaultWidgets(), ...(incoming.widgets || {}) },
+        bodyWeightLog: Array.isArray(incoming.bodyWeightLog) ? incoming.bodyWeightLog : [],
+        measurements: normalizeMeasurements(incoming.measurements),
+        templates: normalizeTemplates(incoming.templates),
+        customExercises: Array.isArray(incoming.customExercises) ? incoming.customExercises : [],
+        statsExpanded: !!incoming.statsExpanded,
+        draft: incoming.draft || null
+      };
+      ui.sessionOpen = false;
+      save();
+      if (data.exportedAt) setDriveLastBackup(data.exportedAt);
+      toast('Restored from Drive');
+      showView('profile');
+      renderAll();
+      renderDriveUI();
+    } catch (err) {
+      console.warn('[Iron Quest] Drive restore failed:', err);
+      setDriveStatus('Restore failed: ' + (err && err.message ? err.message : 'unknown'));
+      toast('Drive restore failed');
+    }
+  }
+
+  function disconnectDrive() {
+    try {
+      if (drive.token && window.google && google.accounts && google.accounts.oauth2) {
+        google.accounts.oauth2.revoke(drive.token, () => {});
+      }
+    } catch (_) {}
+    drive.token = null;
+    drive.tokenExpiresAt = 0;
+    setDriveConnected(false);
+    setDriveStatus('Disconnected');
+    renderDriveUI();
+    toast('Drive disconnected');
+  }
+
+  async function connectDrive() {
+    try {
+      await requestDriveToken(true);
+      toast('Google connected');
+      await uploadDriveBackup({ interactive: false, quiet: false });
+    } catch (err) {
+      console.warn('[Iron Quest] Drive connect failed:', err);
+      setDriveStatus('Connect failed: ' + (err && err.message ? err.message : 'unknown'));
+      toast('Google connect failed');
+    }
+  }
+
 
   function bind() {
     bindSafe('tabs', () => {
@@ -1587,6 +2038,14 @@
       });
     });
 
+
+    bindSafe('drive', () => {
+      safeOn('btn-drive-connect', 'click', () => { connectDrive(); });
+      safeOn('btn-drive-disconnect', 'click', () => { disconnectDrive(); });
+      safeOn('btn-drive-backup', 'click', () => { uploadDriveBackup({ interactive: true, quiet: false }); });
+      safeOn('btn-drive-restore', 'click', () => { restoreFromDrive(); });
+    });
+
     bindSafe('empty-workout', () => {
       safeOn('btn-empty-workout', 'click', () => {
         if (state.draft) {
@@ -1623,19 +2082,40 @@
         const chip = e.target.closest('.chip');
         if (!chip) return;
         const name = chip.getAttribute('data-name') || chip.dataset.name;
+        if (!name) return;
         if (ui.templatePick.has(name)) {
           ui.templatePick.delete(name);
-          chip.classList.remove('selected');
+          ui.templatePickOrder = ui.templatePickOrder.filter((n) => n !== name);
         } else {
           ui.templatePick.add(name);
-          chip.classList.add('selected');
+          ui.templatePickOrder.push(name);
+        }
+        renderTemplatePickUI();
+      });
+      safeOn('template-ex-order', 'click', (e) => {
+        const move = e.target.closest('.btn-tmpl-move');
+        if (move) {
+          const idx = Number(move.getAttribute('data-idx'));
+          const dir = Number(move.getAttribute('data-dir'));
+          if (moveArrayItem(ui.templatePickOrder, idx, dir)) renderTemplatePickUI();
+          return;
+        }
+        const rem = e.target.closest('.btn-tmpl-remove');
+        if (rem) {
+          const idx = Number(rem.getAttribute('data-idx'));
+          const name = ui.templatePickOrder[idx];
+          if (name != null) {
+            ui.templatePickOrder.splice(idx, 1);
+            ui.templatePick.delete(name);
+            renderTemplatePickUI();
+          }
         }
       });
       safeOn('template-save', 'click', () => {
         const name = ($('template-name') && $('template-name').value.trim()) || '';
         if (!name) { toast('Name required'); return; }
-        if (!ui.templatePick.size) { toast('Pick at least one exercise'); return; }
-        const exercises = [...ui.templatePick];
+        if (!ui.templatePickOrder.length) { toast('Pick at least one exercise'); return; }
+        const exercises = ui.templatePickOrder.slice();
         if (ui.editingTemplateId) {
           const t = state.templates.find((x) => x.id === ui.editingTemplateId);
           if (t) {
@@ -1766,6 +2246,16 @@
 
     bindSafe('exercise-list', () => {
       safeOn('exercise-list', 'click', (e) => {
+        const move = e.target.closest('.btn-move-ex');
+        if (move && !move.disabled) {
+          const ei = Number(move.getAttribute('data-ei') || move.dataset.ei);
+          const dir = Number(move.getAttribute('data-dir') || move.dataset.dir);
+          if (state.draft && moveArrayItem(state.draft.exercises, ei, dir)) {
+            save();
+            renderActiveExercises();
+          }
+          return;
+        }
         const rem = e.target.closest('.btn-remove-ex');
         if (rem) {
           state.draft.exercises.splice(Number(rem.getAttribute('data-ei') || rem.dataset.ei), 1);
@@ -1835,12 +2325,14 @@
     });
 
     bindSafe('history', () => {
-      safeOn('history-list', 'click', (e) => {
+      const toggleHistDetail = (e) => {
         const item = e.target.closest('.hist-item');
         if (!item) return;
         const det = item.querySelector('.hist-detail');
         if (det) det.classList.toggle('hidden');
-      });
+      };
+      safeOn('history-list', 'click', toggleHistDetail);
+      safeOn('recent-list', 'click', toggleHistDetail);
       safeOn('log-calendar', 'click', (e) => {
         const day = e.target.closest('.log-day');
         if (!day || day.classList.contains('empty')) return;
@@ -1961,6 +2453,7 @@
         renderMeasure();
         toast('Measurement saved');
         ui.measureTarget = null;
+        scheduleDriveAutoBackup();
       });
       safeOn('btn-log-weight', 'click', () => {
         const val = Number($('weight-input').value);
@@ -1974,6 +2467,7 @@
         renderMeasure();
         renderWidgets();
         toast('Weight logged');
+        scheduleDriveAutoBackup();
       });
     });
 
@@ -2020,6 +2514,16 @@
   claimQuestsIfNeeded();
   save();
   bind();
+  renderDriveUI();
+  // GIS script is async; retry token client init briefly
+  (function waitGis(attempt) {
+    if (ensureDriveTokenClient() || attempt >= 20) {
+      renderDriveUI();
+      return;
+    }
+    setTimeout(() => waitGis(attempt + 1), 250);
+  })(0);
+
   renderAll();
   showView(state.draft ? 'start' : 'profile');
   registerSW();
