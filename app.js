@@ -161,6 +161,20 @@
 
   const DEFAULT_TEMPLATES = [
     {
+      id: 'tmpl-chest-back-tonight',
+      name: 'Chest & Back Tonight',
+      exercises: [
+        'Bench Press',
+        'Incline Bench Press',
+        'Weighted Pull-Up',
+        'Seated Row',
+        'Chest Fly',
+        'Face Pull',
+        'Farmer Carry',
+        'Plank'
+      ]
+    },
+    {
       id: 'tmpl-back',
       name: 'Back Day',
       exercises: ['Pull-Up', 'Barbell Row', 'Lat Pulldown', 'Face Pull', 'Bicep Curl']
@@ -291,6 +305,17 @@
   }
 
   let state = load();
+
+  // Existing installs keep saved templates; inject new default by name once.
+  (function ensureChestBackTonightTemplate() {
+    const name = 'Chest & Back Tonight';
+    if (state.templates.some((t) => t.name === name)) return;
+    const def = DEFAULT_TEMPLATES.find((t) => t.name === name);
+    if (!def) return;
+    state.templates.unshift({ ...def, exercises: def.exercises.slice() });
+    save();
+  })();
+
   let ui = {
     libSearch: '',
     filterBody: '',
